@@ -1,0 +1,25 @@
+{
+  "name": "cargo-quest-2",
+  "version": "1.0.0",
+  "description": "Cargo Quest 2: 3D side-scrolling platformer",
+  "scripts": {
+    "build": "node build.cjs",
+    "test": "node tests/game.cjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Level29Ent/Cargo-Quest.git"
+  },
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Level29Ent/Cargo-Quest/issues"
+  },
+  "homepage": "https://github.com/Level29Ent/Cargo-Quest#readme",
+  "dependencies": {
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  },
+  "private": true
+}
