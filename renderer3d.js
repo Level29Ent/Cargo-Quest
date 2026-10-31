@@ -70,6 +70,7 @@ try {
   let previousWidth=0, previousHeight=0;
   function fit(){
     canvas.style.width=overlay.style.width;canvas.style.height=overlay.style.height;
+    canvas.style.left=overlay.style.left;canvas.style.top=overlay.style.top;
     const width=Math.round(parseFloat(overlay.style.width))||800;
     const height=Math.round(parseFloat(overlay.style.height))||448;
     if(width!==previousWidth || height!==previousHeight){renderer.setSize(width,height,false);previousWidth=width;previousHeight=height;}
