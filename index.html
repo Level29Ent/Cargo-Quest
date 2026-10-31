@@ -28,25 +28,37 @@
   #shop button{font:bold 14px monospace;padding:10px;border:2px solid #f5b800;border-radius:6px;background:#592473;color:white;cursor:pointer} #shop button:disabled{opacity:.5;cursor:not-allowed}
   #shopClose{float:right} #shopStatus{min-height:22px;color:#9fffba} #wallet{color:#ffe08a}
   @media(max-width:460px){#shop{inset:6px;padding:12px}.shopItem{padding:8px}#shopItems{gap:6px}}
+  #world3d{position:absolute;pointer-events:none;box-shadow:none} #c{position:relative;z-index:1}
+  #bView,#bWeapon{position:absolute;z-index:5;top:52px;border:1px solid #74e8da;background:#142b35;color:white;border-radius:6px;padding:9px;font:11px monospace;cursor:pointer}
+  #bView{right:10px} #bWeapon{left:10px}
+  #renderStatus{position:absolute;bottom:110px;left:12px;z-index:4;color:#f8db97;font:11px monospace;max-width:70%;pointer-events:none}
+  #courseStatus{position:absolute;top:94px;left:10px;right:10px;z-index:4;color:#b7f6e9;font:11px/1.5 monospace;pointer-events:none;text-shadow:1px 1px #000}
+  #weapons{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0} #weapons button[aria-pressed="true"]{background:#167b65}
+  #touch .grp{gap:8px} @media(max-width:460px){#touch button{width:52px;height:52px}#touch button.fire,#touch button.jump{width:68px;height:68px}#touch{padding-left:8px;padding-right:8px}}
   @media (pointer:coarse){#touch{display:flex}}
 </style>
 </head>
 <body>
 <div id="wrap">
+  <canvas id="world3d" aria-label="3D game world"></canvas>
   <canvas id="c" width="800" height="448" aria-label="Cargo Quest: Zombie Streets platformer game"></canvas>
   <button id="bS" aria-label="Toggle music and sound">♪ ON</button>
+  <button id="bView" aria-label="Toggle 3D rendering">3D · ON</button>
+  <button id="bWeapon" aria-label="Switch weapon">M240 · NEXT [Q]</button>
+  <span id="renderStatus" role="status"></span><span id="courseStatus"></span>
   <button id="bShop" aria-label="Open coin store">STORE · 0 coins</button>
   <section id="shop" role="dialog" aria-modal="true" aria-labelledby="shopTitle" hidden>
     <button id="shopClose">Close / Resume</button><h1 id="shopTitle">COIN STORE</h1>
     <p id="wallet"></p><p>Earn 1 coin per bolt and 3 per zombie. Coins save on this device. No real-money purchases.</p>
     <p>Start a run to buy. Timed powers last 30 seconds of play; repeat purchases extend them. Powers reset on a new run.</p>
-    <p id="shopStatus" role="status" aria-live="polite"></p><div id="shopItems"></div>
+    <h2>FREE WEAPON LOADOUT</h2><div id="weapons"></div><h2>POWER-UPS</h2><p id="shopStatus" role="status" aria-live="polite"></p><div id="shopItems"></div>
   </section>
   <div id="touch">
     <div class="grp"><button id="bL" aria-label="Move left">&#9664;</button><button id="bR" aria-label="Move right">&#9654;</button></div>
     <div class="grp"><button id="bF" class="fire" aria-label="Fire">FIRE</button><button id="bJ" class="jump" aria-label="Jump">JUMP</button></div>
   </div>
 </div>
+<script src="renderer3d.js" defer></script>
 <script>
 (() => {
 const cv = document.getElementById('c'), cx = cv.getContext('2d');
@@ -391,6 +403,8 @@ addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
   if (shopOpen){ if(k==='escape') closeShop(); return; }
   if (k==='b'){ openShop(); return; }
+  if (k==='q' && !e.repeat) cycleWeapon();
+  if (/^[1-6]$/.test(k)) selectWeapon(Number(k)-1);
   if ([' ','arrowup','arrowdown','arrowleft','arrowright'].includes(k)) e.preventDefault();
   if (!keys[k] && (k===' '||k==='w'||k==='arrowup')) jumpPressed = true;
   keys[k] = true;
@@ -469,15 +483,39 @@ function applyPower(k, announce){
   if (p==='ap' && up.ap>1) name += ' +';
   return name;
 }
-const fireDelay = () => Math.max(3, 8 - up.rapid * 1.5);
 const maxHealth = () => 3 + up.armor;
-const heatPerShot = () => 5.5 / (1 + up.cool * .6);
 const bulletDmg = () => 1 + up.ap * .5;
 
 // ---------- Level building ----------
+const COURSES = [
+  {name:'Neon Market', element:'supply', hint:'Jump into supply crates for coins', sky:'#172239', accent:'#ffb955'},
+  {name:'Canal Bridges', element:'spring', hint:'Green pads launch you upward', sky:'#12364a', accent:'#47dbb4'},
+  {name:'Iron Foundry', element:'steam', hint:'Orange vents flash before hot steam', sky:'#351d29', accent:'#ff794d'},
+  {name:'Skyline Rooftops', element:'wind', hint:'Air currents extend held jumps', sky:'#233a57', accent:'#a5d7ff'},
+  {name:'Frozen Highway', element:'ice', hint:'Blue road has slippery braking', sky:'#34516a', accent:'#97ecff'},
+  {name:'Cargo Conveyor', element:'belt', hint:'Gold belts carry you forward', sky:'#312b32', accent:'#ffd45e'},
+  {name:'Orbital Reactor', element:'gravity', hint:'Low gravity gives longer jumps', sky:'#181333', accent:'#b6a0ff'},
+  {name:'Overgrown Ruins', element:'thorn', hint:'Jump the purple thorn patches', sky:'#17362e', accent:'#bfe16f'},
+  {name:'Flooded Docks', element:'water', hint:'Shallow water slows ground movement', sky:'#173c48', accent:'#4cbef7'},
+  {name:'Thunder Pass', element:'storm', hint:'Yellow beacons warn of lightning', sky:'#24263e', accent:'#fff08f'}
+];
+function decorateCourse(level){
+  level.elements=[];
+  const kind=level.info.course.element;
+  // Place elements only on uninterrupted, open street, never on pit landings or the exit.
+  for(let x=10+(level.i%3);x<level.W-18;x+=11+(level.i%5)){
+    if([0,1,2,3].some(k=>level.grid[12][x+k]!=='#' || level.grid[11][x+k]!==' ')) continue;
+    level.elements.push({x:x*T,w:3*T,kind,phase:(x*13+level.i*19)%240});
+    if(kind==='supply')level.grid[8][x+1]='?';
+  }
+  // Reachable, free power caches create variety without spending saved coins.
+  level.pickups=[{x:7*T,y:GROUND-30,id:SHOP_POWERS[(level.i+8)%SHOP_POWERS.length].id,got:false}];
+  return level;
+}
 const SOLID = new Set(['#','H','B','?','M','U','P','p','=']);
 function buildLevel(i){
   const info = levelInfo(i);
+  info.course = COURSES[(i + Math.floor(i/10)) % COURSES.length];
   const rng = mkRng(i * 7919 + 13);
   const d = i / (TOTAL_LEVELS - 1);
   const W = info.isBoss ? 45 : 150 + Math.floor(d * 90) + Math.floor(rng()*20);
@@ -497,10 +535,10 @@ function buildLevel(i){
   if (info.isBoss){
     row(6,8,'B'+qb()+'B'); row(12,8,'?'); boltRow(9,10,3);
     zombie(15,'walker');
-    plat(24,8,3); plat(37,8,3); plat(30,5,4);
+    plat(24,8-(Math.floor(i/5)%2),3); plat(37,8,3); plat(30,5+(Math.floor(i/10)%3),4);
     for (let y=0;y<12;y++) g[y][44]='H';
     props.push({type:'sign', x:5*T});
-    return { grid:g, W, zs, bolts, props, info, i, d, flagX:-1, arenaX:20, boss:null, bossSpawned:false };
+    return decorateCourse({ grid:g, W, zs, bolts, props, info, i, d, flagX:-1, arenaX:20, boss:null, bossSpawned:false });
   }
 
   let x = 14;
@@ -555,7 +593,7 @@ function buildLevel(i){
     let type = r < .38 ? 'lamp' : r < .62 ? 'car' : 'tree';
     props.push({type, x:px*T, v:Math.floor(rng()*4), s:rng()});
   }
-  return { grid:g, W, zs, bolts, props, info, i, d, flagX, exitX: flagX+5 };
+  return decorateCourse({ grid:g, W, zs, bolts, props, info, i, d, flagX, exitX: flagX+5 });
 }
 
 function makeZombie(x, type, loc, rng){
@@ -587,8 +625,37 @@ const SHOP_POWERS = [
   {id:'damage', name:'Damage Boost', cost:20, desc:'Double bullet damage for 30 seconds.'},
   {id:'coins', name:'Double Coins', cost:15, desc:'Earn twice as many coins for 30 seconds.'},
   {id:'heal', name:'Medkit', cost:10, desc:'Instantly restore all hearts.'},
-  {id:'time', name:'Time Refill', cost:10, desc:'Instantly add 60 to the stage timer.'}
+  {id:'time', name:'Time Refill', cost:10, desc:'Instantly add 60 to the stage timer.'},
+  {id:'haste', name:'Overdrive', cost:20, desc:'Faster movement for 30 seconds.'},
+  {id:'vampire', name:'Vampire Rounds', cost:25, desc:'Every third enemy defeat restores a heart for 30 seconds.'},
+  {id:'frost', name:'Cryo Ammo', cost:20, desc:'Shots slow enemies for 30 seconds.'},
+  {id:'regen', name:'Regeneration', cost:25, desc:'Recover a heart every 5 seconds for 30 seconds.'},
+  {id:'coolant', name:'Infinite Coolant', cost:20, desc:'No weapon heat for 30 seconds.'},
+  {id:'rescue', name:'Rescue Drone', cost:30, desc:'One rescue from a fall within 30 seconds.'}
+
 ];
+const WEAPONS = [
+  {name:'M240', pellets:1, delay:8, speed:14, damage:1, heat:5.5, life:60, color:'#ffe14a'},
+  {name:'Shotgun', pellets:5, delay:30, speed:12, damage:1.2, heat:13, life:23, color:'#ffab65'},
+  {name:'Railgun', pellets:1, delay:38, speed:22, damage:5, heat:18, life:50, pierce:5, color:'#69edff'},
+  {name:'Plasma', pellets:1, delay:12, speed:9, damage:2, heat:8, life:80, color:'#b795ff'},
+  {name:'Flamer', pellets:3, delay:5, speed:7, damage:.5, heat:4, life:16, color:'#ff633b'},
+  {name:'Cryo Blaster', pellets:1, delay:17, speed:11, damage:1.5, heat:7, life:60, slow:true, color:'#b1faff'}
+];
+let weaponIndex=0, vampireKills=0;
+function selectWeapon(index){
+  if(!Number.isInteger(index) || index<0 || index>=WEAPONS.length)return;
+  weaponIndex=index;
+  document.getElementById('bWeapon').textContent=WEAPONS[index].name+' · NEXT [Q]';
+  if(shopOpen)renderShop();
+}
+function cycleWeapon(){selectWeapon((weaponIndex+1)%WEAPONS.length);}
+document.getElementById('bWeapon').addEventListener('click',cycleWeapon);
+function grantPower(id){
+  if(id==='heal')player.health=maxHealth();
+  else if(id==='time'){time+=60;hurried=false;}
+  else effects[id]=(effects[id]||0)+1800;
+}
 function refreshWallet(){
   document.getElementById('bShop').textContent = 'STORE · ' + wallet + ' coins';
   document.getElementById('wallet').textContent = 'Your coins: ' + wallet;
@@ -606,6 +673,8 @@ function releaseControls(){
 }
 function renderShop(){
   refreshWallet();
+  const loadout=document.getElementById('weapons');loadout.replaceChildren();
+  WEAPONS.forEach((weapon,i)=>{const button=document.createElement('button');button.textContent=(i+1)+'. '+weapon.name;button.setAttribute('aria-pressed',String(i===weaponIndex));button.addEventListener('click',()=>selectWeapon(i));loadout.append(button);});
   const container = document.getElementById('shopItems'); container.replaceChildren();
   for(const item of SHOP_POWERS){
     const card = document.createElement('div'); card.className='shopItem';
@@ -625,9 +694,7 @@ function purchasePower(id){
   if(id==='heal' && player.health>=maxHealth()) return false;
   wallet-=item.cost;
   try { localStorage.setItem('cargoQuest2.coins',String(wallet)); } catch(e) {}
-  if(id==='heal') player.health=maxHealth();
-  else if(id==='time') { time+=60; hurried=false; }
-  else effects[id]=(effects[id]||0)+1800;
+  grantPower(id);
   document.getElementById('shopStatus').textContent=item.name+' purchased!';
   snd('power'); renderShop(); return true;
 }
@@ -649,9 +716,9 @@ document.getElementById('shop').addEventListener('keydown',e=>{
 refreshWallet();
 
 function saveBest(){ if (score > best) best = score; }
-function pickStart(dir){ startPick = (startPick + dir*5 + TOTAL_LEVELS) % TOTAL_LEVELS; }
+function pickStart(dir){ startPick = (startPick + dir + TOTAL_LEVELS) % TOTAL_LEVELS; }
 function newGame(from){
-  score = 0; boltCount = 0; lives = 3; effects = {}; resetUpgrades();
+  score = 0; boltCount = 0; lives = 3; effects = {}; vampireKills=0; selectWeapon(0); resetUpgrades();
   const blocks = Math.floor(from / 5);
   for (let k=0;k<blocks;k++) applyPower(k, false);
   startLevel(from);
@@ -734,6 +801,7 @@ function gore(x, y, n, col){
 function killZombie(z, dirSign){
   if (z.dead) return;
   z.dead = true; z.vy = -6; z.vx = 2 * (dirSign || 1); snd('zdie'); if (z.active) zombieSay(z, true);
+  if(effects.vampire>0 && ++vampireKills%3===0)player.health=Math.min(maxHealth(),player.health+1);
   earnCoins(3); combo++; addScore(z.pts, z.x + z.w/2, z.y);
   gore(z.x + z.w/2, z.y + z.h/3, 10);
 }
@@ -753,15 +821,18 @@ function killPlayer(){
 
 function fire(){
   const p = player;
-  const n = up.spread >= 2 ? 5 : up.spread >= 1 ? 3 : 1;
-  const mx = p.x + p.w/2 + p.face*38, my = p.y + 16 + 13;
-  for (let k=0;k<n;k++){
-    const spread = n===1 ? (Math.random()-.5)*.6 : (k - (n-1)/2) * 1.1;
-    bullets.push({ x:mx, y:my, vx:p.face*14, vy:spread, life:60, dmg:bulletDmg() * (effects.damage>0 ? 2 : 1), pierce:up.ap>0 ? 2 : 0, hit:new Set() });
+  const weapon=WEAPONS[weaponIndex];
+  const n=weapon.pellets+(weapon.pellets===1 && up.spread>0 ? (up.spread>=2?4:2) : 0);
+  const mx=p.x+p.w/2+p.face*38, my=p.y+29;
+  for(let k=0;k<n;k++){
+    const spread=n===1?0:(k-(n-1)/2)*(weapon.name==='Flamer'?.65:1.1);
+    bullets.push({x:mx,y:my,vx:p.face*weapon.speed,vy:spread,life:weapon.life,
+      dmg:bulletDmg()*weapon.damage*(effects.damage>0?2:1),pierce:(weapon.pierce||0)+(up.ap>0?2:0),
+      slow:weapon.slow||effects.frost>0,color:weapon.color,hit:new Set()});
   }
   parts.push({kind:'shell', x:p.x+p.w/2 + p.face*8, y:my-4, vx:-p.face*(1.5+Math.random()), vy:-3-Math.random()*2, t:40});
-  p.flash = 3; p.recoil = 2; p.fireCd = fireDelay();
-  p.heat += heatPerShot();
+  p.flash = 3; p.recoil = 2; p.fireCd = Math.max(3,weapon.delay/(1+up.rapid*.2));
+  p.heat += effects.coolant>0 ? 0 : weapon.heat/(1+up.cool*.6);
   if (p.heat >= 100){ p.heat = 100; p.overheat = true; snd('heat'); popups.push({x:p.x+p.w/2, y:p.y-10, t:50, txt:'OVERHEAT'}); }
   snd('shot');
 }
@@ -795,7 +866,8 @@ function updateBoss(){
   const enraged = B.hp < B.maxHp * .4;
   if (enraged && !B.enrageSaid){ B.enrageSaid = true; bossSay(3, true); }
   if (--B.tauntT <= 0){ bossSay(1 + (B.tauntN++ % 2)); B.tauntT = 480 + Math.random()*300; }
-  const spd = B.speed * (enraged ? 1.5 : 1);
+  if(B.slow>0)B.slow--;
+  const spd = B.speed * (enraged ? 1.5 : 1)*(B.slow>0?.4:1);
   if (B.mode==='walk'){
     B.vx = B.face * spd;
     if (B.timer <= 0){
@@ -873,8 +945,15 @@ function update(){
   timeAcc += 1/60;
   if (timeAcc >= .4){ timeAcc -= .4; time--; if (time===100 && !hurried){ hurried = true; snd('hurry'); } if (time<=0){ time=0; killPlayer(); return; } }
 
+  if(effects.regen>0 && effects.regen%300===0)p.health=Math.min(maxHealth(),p.health+1);
+  if(effects.coolant>0){p.heat=0;p.overheat=false;}
+  const course=L.info.course || COURSES[0];
+  const region=(L.elements||[]).find(e=>p.x+p.w>e.x && p.x<e.x+e.w);
+  const onStreet=p.onGround && Math.abs(p.y+p.h-GROUND)<2;
+  const slippery=region && region.kind==='ice' && onStreet;
+  const wading=region && region.kind==='water' && onStreet;
   // movement
-  const maxV = run() ? 5.2 : 3.6, acc = p.onGround ? .32 : .22, fr = p.onGround ? .28 : .08;
+  const maxV = (run() ? 5.2 : 3.6)*(effects.haste>0?1.35:1)*(wading?.65:1), acc = p.onGround ? .32 : .22, fr = slippery?.025:p.onGround ? .28 : .08;
   if (left() && !right()){ p.vx = Math.max(p.vx - acc, -maxV); p.face = -1; }
   else if (right() && !left()){ p.vx = Math.min(p.vx + acc, maxV); p.face = 1; }
   else { if (p.vx>0) p.vx = Math.max(0, p.vx-fr); else if (p.vx<0) p.vx = Math.min(0, p.vx+fr); }
@@ -887,7 +966,7 @@ function update(){
   else if (jumpPressed && up.double && !p.dblUsed && p.coyote<=0){ p.vy = -10.5; p.dblUsed = true; p.buf = 0; snd('jump'); for (let k=0;k<6;k++) parts.push({kind:'puff', x:p.x+p.w/2, y:p.y+p.h, vx:(Math.random()-.5)*3, vy:Math.random()*1.5, t:20}); }
   jumpPressed = false;
   if (!jumpHeld() && p.vy < -4) p.vy = -4;
-  p.vy = Math.min(p.vy + (jumpHeld() && p.vy<0 ? .48 : .8), 13);
+  p.vy = Math.min(p.vy + (jumpHeld() && p.vy<0 ? .48 : .8)*(course.element==='gravity'?.78:course.element==='wind' && jumpHeld() && p.vy<0?.9:1), 13);
 
   // weapon
   if (p.fireCd > 0) p.fireCd--;
@@ -907,6 +986,19 @@ function update(){
   if (p.onGround) combo = 0;
   p.anim += Math.abs(p.vx) * .09;
   if (p.inv>0) p.inv--;
+  if(p.onGround && Math.abs(p.y+p.h-GROUND)<1 && solidAt(Math.floor(p.x/T),12) && solidAt(Math.floor((p.x+p.w-1)/T),12))p.safeX=p.x;
+  if(region && onStreet){
+    const phase=(frame+region.phase)%240;
+    if(region.kind==='spring')p.vy=-15;
+    if(region.kind==='belt' && !p.hitWall){const oldV=p.vx;p.vx=1;moveBody(p);p.vx=oldV;}
+    if(region.kind==='thorn' || (['steam','storm'].includes(region.kind) && phase>=180 && phase<215))hurtPlayer(region.x+region.w/2);
+  }
+  for(const pickup of L.pickups||[])if(!pickup.got && Math.abs(p.x+p.w/2-pickup.x)<28 && Math.abs(p.y+p.h/2-pickup.y)<48){
+    pickup.got=true;grantPower(pickup.id);snd('power');popups.push({x:pickup.x,y:pickup.y,t:80,txt:SHOP_POWERS.find(item=>item.id===pickup.id).name});
+  }
+  if(p.y>ROWS*T+40 && effects.rescue>0){
+    effects.rescue=0;p.x=p.safeX||3*T;cam=Math.max(0,Math.min(cam,p.x-64));p.y=GROUND-p.h;p.vx=0;p.vy=0;p.inv=120;return;
+  }
   if (p.y > ROWS*T + 40){ p.health = 0; state='dying'; stateTimer=100; snd('die'); p.vy=0; return; }
 
   // camera
@@ -933,7 +1025,8 @@ function update(){
     if(effects.freeze>0) continue;
     const dx = (p.x + p.w/2) - (z.x + z.w/2);
     if (Math.abs(dx) < 520 && z.onGround) z.dir = dx < 0 ? -1 : 1;
-    const sp = z.type==='runner' && Math.abs(dx) > 260 ? z.speed*.5 : z.speed;
+    if(z.slow>0)z.slow--;
+    const sp = (z.slow>0?.35:1)*(z.type==='runner' && Math.abs(dx) > 260 ? z.speed*.5 : z.speed);
     z.vx = z.dir * sp;
     z.vy = Math.min(z.vy + .6, 10);
     moveBody(z);
@@ -964,6 +1057,7 @@ function update(){
     for (const z of L.zs){
       if (!z.alive || z.dead || !z.active || b.hit.has(z)) continue;
       if (b.x > z.x && b.x < z.x + z.w && b.y > z.y && b.y < z.y + z.h){
+        if(b.slow)z.slow=180;
         z.hp -= b.dmg; z.flash = 4; b.hit.add(z); z.x += Math.sign(b.vx) * (z.type==='brute' ? .8 : 2.5);
         gore(b.x, b.y, 2);
         if (z.hp <= 0) killZombie(z, Math.sign(b.vx)); else snd('zhit');
@@ -972,6 +1066,7 @@ function update(){
     }
     const B = L.boss;
     if (b.life > 0 && B && !B.dead && b.x > B.x && b.x < B.x + B.w && b.y > B.y && b.y < B.y + B.h){
+      if(b.slow)B.slow=180;
       damageBoss(b.dmg); b.life = 0; gore(b.x, b.y, 2); if (frame % 3 === 0) snd('bosshit');
     }
   }
@@ -1374,6 +1469,12 @@ function drawLevel(){
   const sx = shake ? (Math.random()-.5)*shake : 0, sy = shake ? (Math.random()-.5)*shake : 0;
   cx.save(); cx.translate(-Math.round(cam) + sx, sy);
   for (const pr of L.props) if (pr.x > cam - 200 && pr.x < cam + VW + 50) drawProp(pr);
+  for(const e of L.elements||[]){
+    const phase=(frame+e.phase)%240;cx.fillStyle=['steam','storm','thorn'].includes(e.kind)?(phase>=180 && phase<215?'#ff6040':'#d39d44'):L.info.course.accent;
+    cx.fillRect(e.x,GROUND-5,e.w,5);
+    if(['steam','storm'].includes(e.kind) && phase>=180 && phase<215)cx.fillRect(e.x,GROUND-60,e.w,60);
+  }
+  for(const cache of L.pickups||[])if(!cache.got){cx.fillStyle='#79ffdf';cx.fillRect(cache.x-12,cache.y-12,24,24);sh('+',cache.x,cache.y,'#142d3a',12,'center');}
   // safe-zone exit
   if (L.flagX > 0){
     const ex = L.exitX*T;
@@ -1418,7 +1519,7 @@ function drawLevel(){
     else drawBolt(q.x, q.y);
   }
   for (const b of bullets){
-    cx.strokeStyle = '#ffe14a'; cx.lineWidth = 3; cx.beginPath(); cx.moveTo(b.x, b.y); cx.lineTo(b.x - b.vx*1.4, b.y - b.vy*1.4); cx.stroke();
+    cx.strokeStyle = b.color||'#ffe14a'; cx.lineWidth = 3; cx.beginPath(); cx.moveTo(b.x, b.y); cx.lineTo(b.x - b.vx*1.4, b.y - b.vy*1.4); cx.stroke();
     cx.strokeStyle = 'rgba(255,120,40,.6)'; cx.lineWidth = 1.5; cx.beginPath(); cx.moveTo(b.x - b.vx*1.4, b.y - b.vy*1.4); cx.lineTo(b.x - b.vx*2.4, b.y - b.vy*2.4); cx.stroke();
   }
   if (!(state==='play' && player.inv>0 && frame%6<3)) drawPlayer(player);
@@ -1640,7 +1741,7 @@ function drawHUD(){
   if (state!=='title'){
     for (let k=0;k<maxHealth();k++) heart(18 + k*17, 52, k < player.health);
     // heat gauge
-    sh('M240', 650, 52, player.overheat ? '#ff6a3a' : '#ddd', 8);
+    sh(WEAPONS[weaponIndex].name.toUpperCase(), 620, 65, player.overheat ? '#ff6a3a' : '#ddd', 8);
     cx.fillStyle = '#000'; cx.fillRect(690, 52, 92, 10);
     const hc = player.overheat ? '#ff3a1a' : player.heat > 70 ? '#ff9a2a' : '#f5b800';
     cx.fillStyle = hc; cx.fillRect(691, 53, 90 * player.heat/100, 8);
@@ -1683,12 +1784,12 @@ function drawScreens(){
     if (head.complete) cx.drawImage(head, VW/2-46, 52, 92, 100);
     const si = levelInfo(startPick);
     centerText([['CARGO QUEST', 182, 32, '#f5b800'], ['ZOMBIE STREETS', 218, 14, '#7fd13b'],
-      ['STARRING LEVEL 29 AND HIS M240', 244, 9, '#c58bff'],
+      ['3D SIDE-SCROLLER · SIX WEAPONS', 244, 9, '#c58bff'],
       ['START AT LEVEL  < ' + pad(startPick+1, 3) + ' >', 280, 11, '#fff'],
       [si.street + ' · ' + si.loc.city, 300, 8, '#f5d77a'],
       [frame%60<40 ? 'PRESS ENTER OR TAP TO START' : '', 332, 12],
       ['MOVE ARROWS/A D  JUMP SPACE/W  SHOOT F/J/CLICK', 368, 8, '#ddd'],
-      ['RUN SHIFT  P PAUSE  N MUSIC  M MUTE  R RESTART', 386, 8, '#ddd'],
+      ['Q WEAPON  B STORE  P PAUSE  R RESTART', 386, 8, '#ddd'],
       ['BOSS EVERY 5 LEVELS · BEAT IT FOR A POWER-UP', 408, 8, '#ff8a8a'],
       ['TOP SCORE ' + pad(best, 7), 430, 9, '#9cf09c']]);
   } else if (state==='intro'){
@@ -1698,7 +1799,7 @@ function drawScreens(){
     if (head.complete) cx.drawImage(head, VW/2-62, 222, 30, 33);
     centerText([['     x  ' + lives, 240, 16]]);
     if (info.isBoss) centerText([['WARNING: BOSS AHEAD', 292, 14, '#ff4d5e'], [info.loc.boss.name, 318, 10, '#ff8a8a']]);
-    else centerText([['TIME LIMIT 300', 292, 9, '#aaa']]);
+    else centerText([[info.course.name.toUpperCase(), 292, 12, info.course.accent], [info.course.hint, 320, 8, '#ddd']]);
     centerText([['POWER-UPS: ' + upgradeList(), 380, 8, '#9cf09c']]);
   } else if (state==='pause'){
     cx.fillStyle='rgba(0,0,0,.6)'; cx.fillRect(0,0,VW,VH);
@@ -1750,12 +1851,15 @@ function loop(now){
     cam = (cam + .6) % Math.max(1, (L.W-30)*T);
   }
   updateMusic();
-  drawLevel(); drawHUD(); drawScreens();
+  const view=window.Cargo3D;
+  if(view && view.enabled){cx.clearRect(0,0,VW,VH);view.render(window.__game);}else drawLevel();
+  drawHUD(); drawScreens();
+  document.getElementById('courseStatus').textContent=state==='play' || state==='pause' ? L.info.course.name+' · '+L.info.course.hint : '';
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
 window.__game = { get state(){return state;}, get score(){return score;}, get time(){return time;}, get lives(){return lives;},
-  get player(){return player;}, get L(){return L;}, get up(){return up;}, get level(){return levelIdx;},
+  get player(){return player;}, get cam(){return cam;},get frame(){return frame;},get bullets(){return bullets;},get spits(){return spits;},get parts(){return parts;},get effects(){return effects;},get weapon(){return WEAPONS[weaponIndex];},get flagY(){return flagY;}, get L(){return L;}, get up(){return up;}, get level(){return levelIdx;},
   goto(i){ newGame(i); }, start: onEnter, get music(){ return mus.name; }, get musicStep(){ return mus.step; }, get actx(){ return actx; }, get master(){ return master; }, get soundMode(){ return soundMode; }, get vo(){ return Object.keys(voBufs).length; }, get subtitle(){ return subtitle; }, get zv(){ return [zVoiceUntil, zDeathUntil, actx ? actx.currentTime : 0]; } };
 })();
 </script>
