@@ -121,3 +121,5 @@ for(let i=0;i<100;i++){
 }
 assert.ok(crossings>100);
 console.log('PASS: original jump failure reproduced; fixed normal jump lands; '+crossings+' simulated crossings, '+platforms+' platform tiles across 100 stages checked; six weapon patterns, 14 powers, 10 course mechanics, 100 distinct stage configurations, costs, persistence, pause and expiry checked.');
+
+module.exports = { test: t };

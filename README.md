@@ -6,6 +6,8 @@ A 100-stage side-scrolling platformer with lit, depth-tested Three.js geometry, 
 
 Requires Node 24. Run `npm ci`, `npm test`, and `npm run build`. Serve `public/` with a static HTTP server. The Vercel configuration runs the build and serves `public/`. Three.js is bundled locally; no runtime CDN is required. Artwork and voice clips from the original game remain included.
 
+The enhanced renderer uses smooth low-poly sphere/cylinder/cone characters, an animated three-point jester cap, articulated limbs, detailed weapon models, layered skyline silhouettes, balcony railings, street furniture, generated asphalt/brick textures, emissive tracers and contact-shadow grounding cues. A procedural gradient sky and warm/cool lighting are tone-mapped with ACES. No external art downloads, full-screen bloom pass, or real-time shadow maps are required.
+
 The renderer uses shared instanced geometry/materials, view-window culling, and a device pixel ratio capped at 1.5. It defaults to 3D on WebGL2-capable browsers. The 3D/2D button switches rendering without restarting gameplay. If WebGL initialization or its context fails, gameplay falls back to the original 2D renderer. Real device performance still depends on GPU/browser support.
 
 ## Controls
@@ -75,4 +77,4 @@ The existing `cargoQuest2.coins` browser-storage key is preserved. Coins remain 
 
 ## Verification
 
-`npm test` executes the real game logic with stubbed browser/audio interfaces. It checks six firing patterns; fourteen purchases, effects, costs, expiry and persistence; all ten course mechanics; 100 distinct stage configurations; hazard placement; and the earlier 528 generated pit-platform crossings. `npm run build` bundles the renderer and static assets. Browser checks are separate: a passing simulation does not prove real iPhone/Safari multitouch, GPU performance, or a full playthrough of every course.
+`npm test` checks renderer instance transforms across all 100 stages (with a stubbed GPU), all four geometry types, procedural material/sky creation, batch counts, the rendering toggle, and WebGL failure/context-loss fallback. It also executes the real game logic with stubbed browser/audio interfaces. It checks six firing patterns; fourteen purchases, effects, costs, expiry and persistence; all ten course mechanics; 100 distinct stage configurations; hazard placement; and the earlier 528 generated pit-platform crossings. `npm run build` bundles the renderer and static assets. Browser checks are separate: a passing simulation does not prove real iPhone/Safari multitouch, GPU performance, or a full playthrough of every course.
