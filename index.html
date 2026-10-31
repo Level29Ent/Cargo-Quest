@@ -28,13 +28,15 @@
   #shop button{font:bold 14px monospace;padding:10px;border:2px solid #f5b800;border-radius:6px;background:#592473;color:white;cursor:pointer} #shop button:disabled{opacity:.5;cursor:not-allowed}
   #shopClose{float:right} #shopStatus{min-height:22px;color:#9fffba} #wallet{color:#ffe08a}
   @media(max-width:460px){#shop{inset:6px;padding:12px}.shopItem{padding:8px}#shopItems{gap:6px}}
-  #world3d{position:absolute;pointer-events:none;box-shadow:none} #c{position:relative;z-index:1}
+  #world3d{position:absolute;pointer-events:none;box-shadow:none} #c{position:absolute;z-index:1}
   #bView,#bWeapon{position:absolute;z-index:5;top:52px;border:1px solid #74e8da;background:#142b35;color:white;border-radius:6px;padding:9px;font:11px monospace;cursor:pointer}
   #bView{right:10px} #bWeapon{left:10px}
   #renderStatus{position:absolute;bottom:110px;left:12px;z-index:4;color:#f8db97;font:11px monospace;max-width:70%;pointer-events:none}
   #courseStatus{position:absolute;top:94px;left:10px;right:10px;z-index:4;color:#b7f6e9;font:11px/1.5 monospace;pointer-events:none;text-shadow:1px 1px #000}
   #weapons{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0} #weapons button[aria-pressed="true"]{background:#167b65}
   #touch .grp{gap:8px} @media(max-width:460px){#touch button{width:52px;height:52px}#touch button.fire,#touch button.jump{width:68px;height:68px}#touch{padding-left:8px;padding-right:8px}}
+  #renderStatus{top:122px;bottom:auto;font-size:9px}
+  @media(min-width:700px){#bWeapon{top:10px;left:140px}#bView{top:10px;right:130px}#courseStatus{top:50px}#renderStatus{top:72px}}
   @media (pointer:coarse){#touch{display:flex}}
 </style>
 </head>
@@ -66,7 +68,12 @@ const VW = 800, VH = 448, T = 32, ROWS = 14, GROUND = 12*T;
 const TOTAL_LEVELS = 100;
 
 function fit(){
-  const s = Math.min(innerWidth / VW, innerHeight / VH);
+  const top=innerWidth>=700?86:136;
+  const bottom=typeof matchMedia==='function' && matchMedia('(pointer:coarse)').matches?110:16;
+  const available=Math.max(90,innerHeight-top-bottom);
+  const s = Math.min(innerWidth / VW, available / VH);
+  cv.style.left=Math.floor((innerWidth-VW*s)/2)+'px';
+  cv.style.top=Math.floor(top+(available-VH*s)/2)+'px';
   cv.style.width = Math.floor(VW * s) + 'px';
   cv.style.height = Math.floor(VH * s) + 'px';
 }
