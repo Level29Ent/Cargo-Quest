@@ -4,7 +4,7 @@
   "description": "Cargo Quest 2: 3D side-scrolling platformer",
   "scripts": {
     "build": "node build.cjs",
-    "test": "node tests/game.cjs"
+    "test": "node tests/renderer.cjs"
   },
   "repository": {
     "type": "git",
