@@ -10,7 +10,7 @@ const view = { enabled: false, render() {} };
 window.Cargo3D = view;
 try {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'low-power' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+  renderer.setPixelRatio(1); // fit() chooses native-density output within the pixel budget.
   renderer.setSize(800, 448, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -41,7 +41,8 @@ try {
       for(let y=0;y<128;y+=32){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(128,y);ctx.stroke();
         for(let x=(y/32)%2?32:0;x<128;x+=64){ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,y+32);ctx.stroke();}}
     }
-    const map=new THREE.CanvasTexture(surface);map.colorSpace=THREE.SRGBColorSpace;return map;
+    const map=new THREE.CanvasTexture(surface);map.colorSpace=THREE.SRGBColorSpace;
+    map.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());return map;
   }
   const roadMap=texture('road'), brickMap=texture('brick');
   const skySurface=document.createElement('canvas');skySurface.width=16;skySurface.height=256;
@@ -141,13 +142,17 @@ try {
       if(boss)shape('cone',x,feet+h+8,0,width*.9,20,20,'gold');
     }
   }
-  let previousWidth=0, previousHeight=0;
+  let previousWidth=0, previousHeight=0, previousRatio=0;
   function fit(){
     canvas.style.width=overlay.style.width;canvas.style.height=overlay.style.height;
     canvas.style.left=overlay.style.left;canvas.style.top=overlay.style.top;
     const width=Math.round(parseFloat(overlay.style.width))||800;
     const height=Math.round(parseFloat(overlay.style.height))||448;
-    if(width!==previousWidth || height!==previousHeight){renderer.setSize(width,height,false);previousWidth=width;previousHeight=height;}
+    const ratio=Math.min(window.devicePixelRatio||1,2,Math.sqrt(3000000/(width*height)));
+    if(width!==previousWidth || height!==previousHeight || ratio!==previousRatio){
+      renderer.setPixelRatio(ratio);renderer.setSize(width,height,false);
+      previousWidth=width;previousHeight=height;previousRatio=ratio;
+    }
   }
   view.render = game => {
     if(!game)return;
