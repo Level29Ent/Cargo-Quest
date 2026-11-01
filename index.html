@@ -1481,6 +1481,8 @@ function drawLevel(){
   const sx = shake ? (Math.random()-.5)*shake : 0, sy = shake ? (Math.random()-.5)*shake : 0;
   cx.save(); cx.translate(-Math.round(cam) + sx, sy);
   for (const pr of L.props) if (pr.x > cam - 200 && pr.x < cam + VW + 50) drawProp(pr);
+  // Mute scenery before drawing colliders so fallback keeps the same depth hierarchy.
+  cx.fillStyle='rgba(18,30,48,.48)';cx.fillRect(cam,0,VW,VH);
   for(const e of L.elements||[]){
     const phase=(frame+e.phase)%240;cx.fillStyle=['steam','storm','thorn'].includes(e.kind)?(phase>=180 && phase<215?'#ff6040':'#d39d44'):L.info.course.accent;
     cx.fillRect(e.x,GROUND-5,e.w,5);
@@ -1505,6 +1507,21 @@ function drawLevel(){
     const t = L.grid[ty][tx]; if (t===' ') continue;
     let off = 0; for (const b of bumps) if (b.tx===tx && b.ty===ty) off = -Math.sin((10-b.t)/10*Math.PI)*8;
     drawTile(t, tx*T, ty*T + off, tx, ty, gc);
+    const x=tx*T,y=ty*T+off;
+    if(t==='#' && ty===12){
+      cx.fillStyle='#7cfff0';cx.fillRect(x,y,T,3);
+      for(const side of [-1,1])if(tx+side>=0 && tx+side<L.W && tileAt(tx+side,12)===' '){cx.fillStyle='#ff6565';cx.fillRect(x+(side<0?0:29),y,3,20);}
+    }else if(SOLID.has(t) && t!=='#'){
+      cx.strokeStyle='#101b29';cx.lineWidth=3;cx.strokeRect(x+1.5,y+1.5,29,29);
+      cx.fillStyle=t==='='?'#7cfff0':'#ffe3a0';cx.fillRect(x+3,y+2,26,3);
+      if(['P','p','H'].includes(t))for(let j=0;j<3;j++)cx.fillRect(x+5+j*8,y+12,4,9);
+    }
+  }
+  for(const e of L.elements||[])if(['steam','storm','thorn'].includes(e.kind)){
+    const phase=(frame+e.phase)%240;
+    cx.fillStyle=e.kind==='thorn'||(phase>=180&&phase<215)?'#ff6565':phase>=140&&phase<180?'#ffd25d':'#ffad66';
+    for(let j=0;j<e.w;j+=16)cx.fillRect(e.x+j,GROUND-6,8,6);
+    for(const x of [e.x,e.x+e.w-4])cx.fillRect(x,GROUND-24,4,24);
   }
   if (L.flagX > 0){
     const fx = L.flagX*T + 15;

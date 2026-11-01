@@ -29,7 +29,14 @@ for(let stage=0;stage<100;stage++){
  const level=test.L;level.zs.forEach(z=>{z.active=true;});
  const game={L:level,cam:0,frame:200,player:test.p,effects:{shield:30},weapon:test.WEAPONS[stage%6],flagY:64,
    bullets:[{x:260,y:330,vx:14,vy:0,color:'#ffab65'}],spits:[{x:350,y:330}],parts:[{x:300,y:330,kind:'spark'}],state:'play'};
+ const beforeRender=JSON.stringify([level.grid,level.elements,level.pickups]);
  world.window.__game=game;view.render(game);
+ assert.equal(JSON.stringify([level.grid,level.elements,level.pickups]),beforeRender,'visual changes must not change collisions or elements');
+ const meshes=lastScene.children.filter(m=>m.isInstancedMesh&&m.count>0);
+ assert.ok(meshes.some(m=>m.userData.readabilityRole==='scenery'),'muted scenery present in stage '+stage);
+ assert.ok(meshes.some(m=>m.userData.readabilityRole==='cue'&&m.material.color.getHexString()==='7cfff0'),'cyan landing cue in stage '+stage);
+ for(const m of meshes.filter(m=>m.userData.readabilityRole==='cue')){assert.equal(m.material.isMeshBasicMaterial,true);assert.equal(m.material.toneMapped,false);}
+ for(const m of meshes.filter(m=>m.userData.readabilityRole==='scenery'))assert.equal(m.material.emissiveIntensity,0,'background must not glow like a pickup');
  assert.equal(nodes.world3d.dataset.rendered,'true');assert.equal(nodes.world3d.style.top,'86px');
  for(const mesh of lastScene.children.filter(n=>n.isInstancedMesh)){
    assert.ok(mesh.count<=2048,'instance capacity');
@@ -39,6 +46,16 @@ for(let stage=0;stage<100;stage++){
  }
  maxCalls=Math.max(maxCalls,lastRenderer.info.render.calls);
  assert.ok(lastScene.children.some(m=>m.isMesh&&m.material.map?.isCanvasTexture),'generated sky texture present');
+}
+// Explicit mixed obstacle/pit/hazard fixture: borders and warning phases remain distinct.
+const fixtureGame=world.window.__game;
+fixtureGame.L.grid[9].splice(5,8,'H','B','P','p','?','M','U','=');fixtureGame.L.grid[12][9]=' ';
+fixtureGame.cam=0;
+for(const [kind,phase,color] of [['steam',0,'ffad66'],['steam',150,'ffd25d'],['steam',190,'ff6565'],['storm',190,'ff6565'],['thorn',0,'ff6565']]){
+ fixtureGame.frame=phase;fixtureGame.L.elements=[{x:320,w:96,kind,phase:0}];world.window.__game=fixtureGame;view.render(fixtureGame);
+ const cue=lastScene.children.find(m=>m.isInstancedMesh&&m.count>0&&m.userData.readabilityRole==='cue'&&m.material.color.getHexString()===color);
+ assert.ok(cue,kind+' hazard phase '+phase+' is visibly marked');
+ assert.ok(lastScene.children.some(m=>m.isInstancedMesh&&m.count>0&&m.userData.readabilityRole==='cue'&&m.material.color.getHexString()==='ffe3a0'),'solid collider frame present');
 }
 for(const shape of ['BoxGeometry','SphereGeometry','CylinderGeometry','ConeGeometry'])assert.ok(shapeTypes.has(shape),shape);
 assert.ok(maxCalls<100,'material batching remains bounded');
