@@ -11,7 +11,7 @@
   html,body{margin:0;height:100%;background:#0d0a14;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none}
   body{display:flex;align-items:center;justify-content:center;font-family:'Press Start 2P',monospace}
   #wrap{position:relative;width:100vw;height:100vh;display:flex;align-items:center;justify-content:center}
-  canvas{display:block;box-shadow:0 0 0 4px #1d1528,0 20px 60px rgba(0,0,0,.6)}
+  canvas{image-rendering:crisp-edges;image-rendering:pixelated;display:block;box-shadow:0 0 0 4px #1d1528,0 20px 60px rgba(0,0,0,.6)}
   #bS{position:absolute;top:10px;right:10px;z-index:5;font:10px 'Press Start 2P',monospace;color:#fff;background:rgba(20,12,30,.65);border:2px solid #f5b800;border-radius:6px;padding:8px 10px;cursor:pointer}
   #bS:hover{background:rgba(138,0,168,.7)}
   #touch{position:absolute;inset:auto 0 0 0;display:none;justify-content:space-between;padding:14px 16px calc(14px + env(safe-area-inset-bottom));pointer-events:none}
@@ -81,6 +81,8 @@ function fit(){
   const ratio=Math.min(window.devicePixelRatio||1,2,Math.sqrt(3000000/(width*height)));
   cv.width=Math.round(width*ratio);cv.height=Math.round(height*ratio);
   cx.setTransform(cv.width/VW,0,0,cv.height/VH,0,0);
+  // Resizing resets Canvas2D state, so reapply nearest-neighbor sprite sampling here.
+  cx.imageSmoothingEnabled=false;
 }
 addEventListener('resize', fit); fit();
 

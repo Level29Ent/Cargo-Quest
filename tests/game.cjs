@@ -1,10 +1,11 @@
 const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict');
 const path=require('node:path');
 const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
+assert.match(html,/canvas\{[^}]*image-rendering:crisp-edges;image-rendering:pixelated;/,'both canvas scaling CSS fallbacks are present');
 let src=html.match(/<script>([\s\S]*?)<\/script>/)[1];
 const store={};const nodes={};const hudText=[];
 const drawing=new Proxy({setTransform(...args){this.transform=args;},fillText(text){hudText.push(text);}}, {get(target,key){return key in target?target[key]:()=>{};}});
-function el(){return {style:{},classList:{add(){},remove(){}},addEventListener(){},getContext(){return drawing},replaceChildren(){},append(){},setAttribute(){},focus(){},hidden:true};}
+function el(){return {set width(v){this._width=v;drawing.imageSmoothingEnabled=true;},get width(){return this._width},set height(v){this._height=v;drawing.imageSmoothingEnabled=true;},get height(){return this._height},style:{},classList:{add(){},remove(){}},addEventListener(){},getContext(){return drawing},replaceChildren(){},append(){},setAttribute(){},focus(){},hidden:true};}
 const sandbox={console,Math,Set,Image:function(){},innerWidth:390,innerHeight:844,performance:{now:()=>0},requestAnimationFrame(){},setTimeout(){},addEventListener(){},document:{getElementById:id=>nodes[id]??=el(),createElement:()=>el(),querySelectorAll:()=>[]},localStorage:{getItem:k=>store[k]??null,setItem:(k,v)=>store[k]=v}};
 sandbox.window=sandbox;
 src=src.replace('window.__game =',`window.test={buildLevel,moveBody,newGame,update,openShop,closeShop,purchasePower,earnCoins,addBolt,killZombie,hurtPlayer,fire,spawnBoss,SHOP_POWERS,WEAPONS,selectWeapon,grantPower,COURSES,fit,drawHUD,
@@ -16,7 +17,8 @@ assert.equal(t.SHOP_POWERS.length,14);
 const cssWidth=()=>parseFloat(nodes.c.style.width);
 const cssHeight=()=>parseFloat(nodes.c.style.height);
 for(const [width,height,dpr] of [[390,844,3],[1280,800,2],[2560,1440,3],[800,600,1]]){
- sandbox.innerWidth=width;sandbox.innerHeight=height;sandbox.devicePixelRatio=dpr;t.fit();
+ sandbox.innerWidth=width;sandbox.innerHeight=height;sandbox.devicePixelRatio=dpr;drawing.imageSmoothingEnabled=true;t.fit();
+ assert.equal(drawing.imageSmoothingEnabled,false,'nearest sprite sampling restored on resize');
  assert.ok(nodes.c.width*nodes.c.height<=3004000,'HUD resolution stays budgeted');
  if(cssWidth()*cssHeight()<=3000000)assert.ok(nodes.c.width>=cssWidth(),'HUD not CSS-upscaled within budget');
  assert.equal(drawing.transform[0],nodes.c.width/800);

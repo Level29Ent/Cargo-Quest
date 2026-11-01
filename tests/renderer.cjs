@@ -9,7 +9,7 @@ const THREE = await import('three');
 const source = esbuild.transformSync(fs.readFileSync(path.join(__dirname,'../renderer3d.js'),'utf8'),{format:'cjs'}).code;
 let lastScene, lastRenderer;
 class Renderer {
-  constructor(){lastRenderer=this;this.info={render:{calls:0}};this.capabilities={getMaxAnisotropy:()=>8};}
+  constructor(options){assert.equal(options.antialias,false,'no MSAA edge blending');lastRenderer=this;this.info={render:{calls:0}};this.capabilities={getMaxAnisotropy:()=>8};}
   setPixelRatio(value){assert.ok(value<=2);this.ratio=value;}
   setSize(w,h){this.width=w;this.height=h;}
   render(scene){lastScene=scene;this.info.render.calls=scene.children.filter(m=>m.isInstancedMesh&&m.count>0).length;}
@@ -65,7 +65,12 @@ for(const [w,h,dpr] of [[390,218,3],[1280,716,2],[2560,1433,3],[800,448,1]]){
  view.render(fixture);assert.ok(lastRenderer.width*lastRenderer.height*lastRenderer.ratio**2<=3000001);
  assert.equal(lastRenderer.ratio,Math.min(dpr,2,Math.sqrt(3000000/(w*h))));
 }
-for(const mesh of lastScene.children.filter(n=>n.isInstancedMesh&&n.material.map))assert.equal(mesh.material.map.anisotropy,4);
+const maps=new Set(lastScene.children.filter(n=>n.isMesh&&n.material.map).map(n=>n.material.map));
+assert.ok(maps.size>=3,'road, brick and sky textures tested');
+for(const map of maps){
+ assert.equal(map.magFilter,THREE.NearestFilter);assert.equal(map.minFilter,THREE.NearestFilter);
+ assert.equal(map.generateMipmaps,false);assert.equal(map.anisotropy,1);
+}
 
 nodes.bView.events.click();assert.equal(view.enabled,false);assert.equal(nodes.world3d.hidden,true);
 nodes.bView.events.click();assert.equal(view.enabled,true);
