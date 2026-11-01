@@ -12,6 +12,10 @@ The enhanced renderer uses smooth low-poly sphere/cylinder/cone characters, an a
 
 The renderer uses shared instanced geometry/materials, view-window culling, and native-density output up to 2× with a three-million-pixel budget shared in policy by the 3D and HUD canvases. It defaults to 3D on WebGL2-capable browsers. The 3D/2D button switches rendering without restarting gameplay. If WebGL initialization or its context fails, gameplay falls back to the original 2D renderer. Real device performance still depends on GPU/browser support.
 
+## Visual readability
+
+Background buildings, cars, trees and lamps use a muted blue-grey material pass; scenery does not receive the bright gameplay edge markings. Foreground solids use warm amber bodies with dark frames and cream top lips. Cyan edges identify landing surfaces; red end caps mark pit lips. Steam, lightning and thorn areas have permanent striped footprints and posts, with distinct idle/warning/active colors. The legend is visible above the game. These shape/pattern cues supplement color, and the 2D fallback keeps matching edge/stripe cues. Geometry, hitboxes, hazard timing and saved coins are unchanged.
+
 ## Controls
 
 - Move: A/D or arrows. Jump: Space/W/Up (hold for height; tap for a short platform hop).

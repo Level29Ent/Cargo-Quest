@@ -62,21 +62,24 @@ try {
     skin:'#d4a774', boots:'#172536', red:'#ff675f', blue:'#6ec4e8', glass:'#a6e9ee',
     zombie:'#8cab64', trunk:'#846354', leaves:'#438a74', silver:'#bac5d1', orange:'#f6a35b'
   };
+  let sceneryPass=false;
   function batch(color,shape='box',finish='matte') {
     const key=shape+':'+finish+':'+color;
     if (batches.has(key)) return batches.get(key);
-    const material = new THREE.MeshStandardMaterial({ color,
+    const surfaceColor=finish==='scenery'?new THREE.Color(color).lerp(new THREE.Color('#243247'),.66):color;
+    const material = finish==='cue'?new THREE.MeshBasicMaterial({color,toneMapped:false}):new THREE.MeshStandardMaterial({ color:surfaceColor,
       roughness:finish==='metal'?.3:.82, metalness:finish==='metal'?.65:.03,
       emissive:finish==='glow'?color:0x000000,emissiveIntensity:finish==='glow'?1.5:0,
       map:color===palette.road?roadMap:color===palette.brick?brickMap:null
     });
     const mesh = new THREE.InstancedMesh(geometries[shape], material, 2048);
+    mesh.userData.readabilityRole=finish;
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); mesh.frustumCulled = false;
     scene.add(mesh); const result = {mesh,count:0}; batches.set(key,result); return result;
   }
   const zAxis=new THREE.Vector3(0,0,1), xAxis=new THREE.Vector3(1,0,0);
   function shape(kind,x,y,z,w,h,d,color,angle=0,finish='matte',axis=THREE.Object3D.DEFAULT_UP){
-    const b=batch(palette[color] || color,kind,finish); if(b.count>=2048)return;
+    const b=batch(palette[color] || color,kind,sceneryPass?'scenery':finish); if(b.count>=2048)return;
     position.set(x,y,z); scale.set(w,h,d);rotation.setFromAxisAngle(axis,angle);
     matrix.compose(position,rotation,scale);b.mesh.setMatrixAt(b.count++,matrix);
   }
@@ -168,6 +171,7 @@ try {
       gradient.addColorStop(0,'#080e22');gradient.addColorStop(.55,course.sky);gradient.addColorStop(1,course.accent);
       skyCtx.fillStyle=gradient;skyCtx.fillRect(0,0,16,256);skyMap.needsUpdate=true;
     }
+    sceneryPass=true;
     // Distant silhouettes shift more slowly than the foreground, adding depth.
     for(let k=-3;k<12;k++){
       const x=Math.floor(cam*.35/180)*180+k*180+cam*.65;
@@ -216,6 +220,7 @@ try {
         case 'storm': box(x,64+height+38,-200,4,76,4,'silver');box(x,64+height+75,-200,12,8,12,'gold');break;
       }
     }
+    sceneryPass=false;
     // Back retaining wall and luminous lane markers expose road depth.
     for(let x=start;x<end;x++)for(let y=0;y<14;y++){
       const tile=L.grid[y][x];if(tile===' ')continue;
@@ -223,17 +228,28 @@ try {
       if(tile==='#'){
         box(wx,wy,-9,32,32,100,y===12?'road':'rock');
         if(y===12){
-          box(wx,wy+16,38,32,3,5,'edge');box(wx,wy-2,42,30,22,2,'rock');
+          box(wx,wy+16,38,32,3,5,'#7cfff0',0,'cue');box(wx,wy-2,42,30,22,2,'rock');
+          for(const side of [-1,1])if(x+side>=0 && x+side<L.W && L.grid[12][x+side]===' '){
+            box(wx+side*14,wy+16,0,3,3,76,'#ff6565',0,'cue');
+            box(wx+side*14,wy+7,43,3,20,3,'#ff6565',0,'cue');
+          }
           if(x%4===0)box(wx,wy+17,-20,15,1,3,'gold');
           if(x%3===0){box(wx,wy+17,12,18,1,2,'dark');box(wx-7,wy+17,15,2,1,10,'dark');}
         }
       }else{
-        const color=tile==='='?'silver':tile==='?'?'gold':tile==='M'?'white':tile==='B'?'brick':tile==='H'?'rock':tile==='U'?'trunk':'teal';
+        const color=tile==='='?'#28788b':tile==='?'?'gold':tile==='M'?'white':tile==='B'?'#d27b38':tile==='H'?'#a85d30':tile==='U'?'#826044':'#c97831';
         box(wx,wy,0,31,32,38,color);
         if(tile==='?'||tile==='M'){box(wx,wy,21,5,17,3,tile==='M'?'red':'purple');box(wx,wy+3,21,14,5,3,tile==='M'?'red':'purple');}
-        if(tile==='=')box(wx,wy+17,0,32,3,40,course.accent);
+        // Dark frame + bright top lip: solid objects read independently of backdrop or hue.
+        const topColor=tile==='='?'#7cfff0':'#ffe3a0';
+        box(wx,wy+14,21,32,4,3,'#101b29',0,'cue');
+        box(wx,wy+14,23,28,2,2,topColor,0,'cue');
+        box(wx-14,wy,21,3,32,3,'#101b29',0,'cue');box(wx+14,wy,21,3,32,3,'#101b29',0,'cue');
+        box(wx,wy-14,21,32,3,3,'#101b29',0,'cue');
+        if(['P','p','H'].includes(tile))for(let stripe=-1;stripe<=1;stripe++)box(wx+stripe*8,wy,22,4,10,2,'#ffe3a0',0,'cue');
       }
     }
+    sceneryPass=true;
     for(const prop of L.props){
       if(prop.x<cam-100||prop.x>cam+900)continue;
       if(prop.type==='tree'){
@@ -247,14 +263,23 @@ try {
         box(prop.x,131,-65,5,134,5,'dark');box(prop.x+9,201,-65,24,7,16,'gold',0,'glow');
       }
     }
+    sceneryPass=false;
     for(const e of L.elements||[]){
       if(e.x<cam-100||e.x>cam+900)continue;
       const phase=(frame+e.phase)%240;
       const hot=['steam','storm'].includes(e.kind)&&phase>=180&&phase<215;
       const warning=phase>=140&&phase<180;
-      box(e.x+e.w/2,65,1,e.w,3,72,hot?'red':warning?'gold':course.accent);
+      const danger=['steam','storm','thorn'].includes(e.kind);
+      const marker=danger?(e.kind==='thorn'||hot?'#ff6565':warning?'#ffd25d':'#ffad66'):'#7cfff0';
+      box(e.x+e.w/2,66,1,e.w,4,72,'#101b29',0,'cue');
+      box(e.x+e.w/2,67,37,e.w,3,3,marker,0,'cue');
+      if(danger){
+        // Stripes remain visible even between attack cycles; red posts bookend the danger span.
+        for(let j=0;j<e.w;j+=16)box(e.x+j+4,68,8,8,2,48,marker,0,'cue');
+        for(const x of [e.x+3,e.x+e.w-3]){box(x,79,27,4,25,4,'#101b29',0,'cue');orb(x,94,27,7,7,7,marker);}
+      }
       if(e.kind==='spring')for(let j=0;j<3;j++)box(e.x+12+j*32,72,0,18,9,22,'green');
-      if(e.kind==='thorn')for(let j=0;j<6;j++)shape('cone',e.x+8+j*16,76,0,10,22,10,'purple');
+      if(e.kind==='thorn')for(let j=0;j<6;j++)shape('cone',e.x+8+j*16,76,0,10,22,10,'#ff6565');
       if(e.kind==='water')box(e.x+e.w/2,70,0,e.w,10,70,'blue');
       if(e.kind==='belt')for(let j=0;j<5;j++)box(e.x+((frame+j*20)%e.w),68,25,10,2,12,'dark');
       if(hot)for(let j=0;j<4;j++){
@@ -296,7 +321,7 @@ try {
   view.enabled=true;
   function setEnabled(enabled){
     view.enabled=enabled;canvas.hidden=!enabled;button.textContent=enabled?'3D · ON':'2D · ON';
-    status.textContent=enabled?'3D WORLD · ENHANCED · Q / 1–6: WEAPONS':'';
+    status.textContent='CYAN EDGE: LAND · AMBER FRAME: SOLID · STRIPES: DANGER';
   }
   button.addEventListener('click',()=>setEnabled(!view.enabled));
   canvas.addEventListener('webglcontextlost',event=>{
