@@ -2,17 +2,30 @@ const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict');
 const path=require('node:path');
 const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
 let src=html.match(/<script>([\s\S]*?)<\/script>/)[1];
-const store={};const nodes={};
-function el(){return {style:{},classList:{add(){},remove(){}},addEventListener(){},getContext(){return {}},replaceChildren(){},append(){},setAttribute(){},focus(){},hidden:true};}
+const store={};const nodes={};const hudText=[];
+const drawing=new Proxy({setTransform(...args){this.transform=args;},fillText(text){hudText.push(text);}}, {get(target,key){return key in target?target[key]:()=>{};}});
+function el(){return {style:{},classList:{add(){},remove(){}},addEventListener(){},getContext(){return drawing},replaceChildren(){},append(){},setAttribute(){},focus(){},hidden:true};}
 const sandbox={console,Math,Set,Image:function(){},innerWidth:390,innerHeight:844,performance:{now:()=>0},requestAnimationFrame(){},setTimeout(){},addEventListener(){},document:{getElementById:id=>nodes[id]??=el(),createElement:()=>el(),querySelectorAll:()=>[]},localStorage:{getItem:k=>store[k]??null,setItem:(k,v)=>store[k]=v}};
 sandbox.window=sandbox;
-src=src.replace('window.__game =',`window.test={buildLevel,moveBody,newGame,update,openShop,closeShop,purchasePower,earnCoins,addBolt,killZombie,hurtPlayer,fire,spawnBoss,SHOP_POWERS,WEAPONS,selectWeapon,grantPower,COURSES,
+src=src.replace('window.__game =',`window.test={buildLevel,moveBody,newGame,update,openShop,closeShop,purchasePower,earnCoins,addBolt,killZombie,hurtPlayer,fire,spawnBoss,SHOP_POWERS,WEAPONS,selectWeapon,grantPower,COURSES,fit,drawHUD,
 get weaponIndex(){return weaponIndex},set frame(v){frame=v},
 get spits(){return spits},
 get wallet(){return wallet},get effects(){return effects},get bullets(){return bullets},get p(){return player},get L(){return L},set L(v){L=v},get state(){return state},set state(v){state=v},get time(){return time},get touch(){return touch},get keys(){return keys},jump(){jumpPressed=true}}; window.__game =`);
 vm.runInNewContext(src,sandbox);const t=sandbox.test;
 assert.equal(t.SHOP_POWERS.length,14);
-t.newGame(0);t.state='play';
+const cssWidth=()=>parseFloat(nodes.c.style.width);
+const cssHeight=()=>parseFloat(nodes.c.style.height);
+for(const [width,height,dpr] of [[390,844,3],[1280,800,2],[2560,1440,3],[800,600,1]]){
+ sandbox.innerWidth=width;sandbox.innerHeight=height;sandbox.devicePixelRatio=dpr;t.fit();
+ assert.ok(nodes.c.width*nodes.c.height<=3004000,'HUD resolution stays budgeted');
+ if(cssWidth()*cssHeight()<=3000000)assert.ok(nodes.c.width>=cssWidth(),'HUD not CSS-upscaled within budget');
+ assert.equal(drawing.transform[0],nodes.c.width/800);
+ assert.equal(drawing.transform[3],nodes.c.height/448);
+ assert.equal(nodes.c.width,Math.round(cssWidth()*Math.min(dpr,2,Math.sqrt(3000000/(cssWidth()*cssHeight())))));
+}
+sandbox.innerWidth=390;sandbox.innerHeight=844;sandbox.devicePixelRatio=1;t.fit();
+
+t.newGame(0);t.state='play';t.drawHUD();assert.ok(hudText.includes('CARGO QUEST'));assert.ok(!hudText.includes('LEVEL 29'));
 assert.equal(t.purchasePower('shield'),false);
 t.addBolt(0,0);assert.equal(t.wallet,1);
 const z=t.L.zs[0];t.killZombie(z,1);assert.equal(t.wallet,4);t.killZombie(z,1);assert.equal(t.wallet,4);
