@@ -9,7 +9,7 @@ const status = document.getElementById('renderStatus');
 const view = { enabled: false, render() {} };
 window.Cargo3D = view;
 try {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'low-power' });
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: 'low-power' });
   renderer.setPixelRatio(1); // fit() chooses native-density output within the pixel budget.
   renderer.setSize(800, 448, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -29,6 +29,14 @@ try {
     cone: new THREE.ConeGeometry(.5,1,12)
   };
   // Generated once, locally: no extra image requests or full-screen post-processing.
+  // Neither the orthographic camera nor CSS creates a resampling pass: the
+  // scene renders directly into the native-density framebuffer. Texture reads
+  // and any browser enlargement must also avoid interpolating pixel colors.
+  function pixelTexture(map){
+    map.magFilter=THREE.NearestFilter;map.minFilter=THREE.NearestFilter;
+    map.generateMipmaps=false;map.anisotropy=1;
+    return map;
+  }
   function texture(kind){
     const surface=document.createElement('canvas');surface.width=128;surface.height=128;
     const ctx=surface.getContext('2d');ctx.fillStyle=kind==='road'?'#b6b6b6':'#ded3c8';ctx.fillRect(0,0,128,128);
@@ -42,12 +50,12 @@ try {
         for(let x=(y/32)%2?32:0;x<128;x+=64){ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,y+32);ctx.stroke();}}
     }
     const map=new THREE.CanvasTexture(surface);map.colorSpace=THREE.SRGBColorSpace;
-    map.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());return map;
+    return pixelTexture(map);
   }
   const roadMap=texture('road'), brickMap=texture('brick');
   const skySurface=document.createElement('canvas');skySurface.width=16;skySurface.height=256;
   const skyCtx=skySurface.getContext('2d');
-  const skyMap=new THREE.CanvasTexture(skySurface);skyMap.colorSpace=THREE.SRGBColorSpace;
+  const skyMap=pixelTexture(new THREE.CanvasTexture(skySurface));skyMap.colorSpace=THREE.SRGBColorSpace;
   const sky=new THREE.Mesh(new THREE.PlaneGeometry(2800,1400),new THREE.MeshBasicMaterial({map:skyMap,depthWrite:false}));
   sky.position.set(400,400,-850);sky.renderOrder=-1;scene.add(sky);
   let skyColor='';
