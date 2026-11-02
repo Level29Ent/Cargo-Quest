@@ -24,6 +24,14 @@ Background buildings, cars, trees and lamps use a muted blue-grey material pass;
 - Start/resume: Enter or tap. Pause: P. Restart stage: R. Title arrows select any starting stage.
 - Store: STORE button or B. Escape closes it. Shopping pauses gameplay and effect timers.
 
+## Responsive game feel
+
+Ground contact remains stable under subpixel gravity. Normal ground acceleration reaches the unchanged walking top speed in eight simulation ticks; firmer braking and faster reversals help avoid accidental pit drift. Ice retains its slippery handling, and air steering/jump height remain unchanged. Coyote grace is eight ticks (~133 ms) and the jump buffer is nine ticks (~150 ms) at 60 Hz; hold for height, release for short hops.
+
+Touch buttons use captured Pointer Events with per-button pointer ownership, so releasing FIRE cannot cancel movement or another finger. The onscreen pause/resume button works alongside P. Losing window focus or hiding the page clears held controls and pauses active gameplay; resume explicitly. Pause and shopping freeze simulation/hazard timers. New stages clear stale held inputs.
+
+Successful shots display a short hit-confirmation marker in both render modes, damage shows a brief border flash, and solid landings emit dust. 3D weapons now use the existing recoil value. No hit-stop, forced camera shake, new currency charges, or weapon damage changes are introduced. Existing saved coins and course layouts are preserved.
+
 ## Six free weapons
 
 All weapons are immediately available; there is no paid weapon gate or ammunition grind. Heat and cooldowns provide different trade-offs. Existing boss-reward weapon upgrades apply to the equipped weapon.
