@@ -13,6 +13,8 @@
   #wrap{position:relative;width:100vw;height:100vh;display:flex;align-items:center;justify-content:center}
   canvas{image-rendering:crisp-edges;image-rendering:pixelated;display:block;box-shadow:0 0 0 4px #1d1528,0 20px 60px rgba(0,0,0,.6)}
   #bS{position:absolute;top:10px;right:10px;z-index:5;font:10px 'Press Start 2P',monospace;color:#fff;background:rgba(20,12,30,.65);border:2px solid #f5b800;border-radius:6px;padding:8px 10px;cursor:pointer}
+  #bPause{position:absolute;bottom:12px;right:12px;z-index:5;font:11px monospace;color:white;background:#142b35;border:1px solid #74e8da;border-radius:6px;padding:10px;touch-action:manipulation}
+  @media(pointer:coarse){#bPause{bottom:106px}}
   #bS:hover{background:rgba(138,0,168,.7)}
   #touch{position:absolute;inset:auto 0 0 0;display:none;justify-content:space-between;padding:14px 16px calc(14px + env(safe-area-inset-bottom));pointer-events:none}
   #touch .grp{display:flex;gap:12px;pointer-events:auto;align-items:flex-end}
@@ -44,6 +46,7 @@
 <div id="wrap">
   <canvas id="world3d" aria-label="3D game world"></canvas>
   <canvas id="c" width="800" height="448" aria-label="Cargo Quest: Zombie Streets platformer game"></canvas>
+  <button id="bPause" aria-label="Pause or resume game">PAUSE [P]</button>
   <button id="bS" aria-label="Toggle music and sound">♪ ON</button>
   <button id="bView" aria-label="Toggle 3D rendering">3D · ON</button>
   <button id="bWeapon" aria-label="Switch weapon">M240 · NEXT [Q]</button>
@@ -430,18 +433,35 @@ addEventListener('keydown', e => {
   }
   if (k==='m') setSoundMode(soundMode===2 ? 0 : 2);
   if (k==='n') setSoundMode(soundMode===0 ? 1 : 0);
-  if (k==='p' && (state==='play'||state==='pause')) state = state==='play' ? 'pause' : 'play';
+  if (k==='p' && !e.repeat) togglePause();
   if (k==='r' && (state==='play'||state==='pause')) startLevel(levelIdx);
 });
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 const touch = {L:false,R:false,J:false,F:false};
+const controlReleases=[];
 function bindBtn(id, key){
-  const b = document.getElementById(id);
-  const on = e => { e.preventDefault(); ensureAudio(); if (key==='J' && !touch.J) jumpPressed = true; touch[key]=true; b.classList.add('on'); if (state==='title'||state==='gameover'||state==='win'||state==='pause') onEnter(); };
-  const off = e => { e.preventDefault(); touch[key]=false; b.classList.remove('on'); };
-  b.addEventListener('touchstart', on, {passive:false}); b.addEventListener('touchend', off); b.addEventListener('touchcancel', off);
-  b.addEventListener('mousedown', on); b.addEventListener('mouseup', off); b.addEventListener('mouseleave', off);
+  const b=document.getElementById(id), pointers=new Set();
+  const sync=()=>{touch[key]=pointers.size>0;b.classList.toggle('on',touch[key]);};
+  controlReleases.push(()=>{pointers.clear();sync();});
+  b.addEventListener('pointerdown',e=>{
+    e.preventDefault();ensureAudio();
+    if(key==='J' && !touch.J)jumpPressed=true;
+    pointers.add(e.pointerId);b.setPointerCapture(e.pointerId);sync();
+    if(['title','gameover','win','pause'].includes(state))onEnter();
+  });
+  const off=e=>{pointers.delete(e.pointerId);sync();};
+  b.addEventListener('pointerup',off);b.addEventListener('pointercancel',off);b.addEventListener('lostpointercapture',off);
 }
+function togglePause(){
+  if(shopOpen || !['play','pause'].includes(state))return;
+  releaseControls();state=state==='play'?'pause':'play';
+}
+function suspendGame(){
+  releaseControls();if(state==='play')state='pause';
+}
+document.getElementById('bPause').addEventListener('click',togglePause);
+addEventListener('blur',suspendGame);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)suspendGame();});
 document.getElementById('bS').addEventListener('click', e => { e.stopPropagation(); ensureAudio(); setSoundMode(soundMode + 1); });
 bindBtn('bL','L'); bindBtn('bR','R'); bindBtn('bJ','J'); bindBtn('bF','F');
 cv.addEventListener('pointerdown', e => {
@@ -680,6 +700,7 @@ function earnCoins(n){
   refreshWallet();
 }
 function releaseControls(){
+  controlReleases.forEach(release=>release());
   for(const k in keys) keys[k]=false;
   for(const k in touch) touch[k]=false;
   document.querySelectorAll('#touch button').forEach(b=>b.classList.remove('on'));
@@ -738,9 +759,10 @@ function newGame(from){
   startLevel(from);
 }
 function startLevel(i){
+  releaseControls();
   levelIdx = i; L = buildLevel(i);
   player = { x:3*T, y:GROUND-60-2, w:24, h:60, vx:0, vy:0, onGround:false, face:1, anim:0, coyote:0, buf:0, inv:60,
-             health:maxHealth(), heat:0, overheat:false, fireCd:0, flash:0, dblUsed:false, recoil:0 };
+             health:maxHealth(), heat:0, overheat:false, fireCd:0, flash:0, dblUsed:false, recoil:0, hitMark:0, hitX:0, hitY:0, hurtFlash:0 };
   cam = 0; time = L.info.isBoss ? 250 : 300; timeAcc = 0; hurried = false;
   popups = []; parts = []; bumps = []; bullets = []; spits = []; combo = 0; banner = null; bossBarShow = 0;
   stopBossVoice(); subtitle = null;
@@ -774,7 +796,9 @@ function moveBody(b, onHeadHit){
   if (b.hitWall && !b.keepVx) b.vx = 0;
   b.y += b.vy; b.onGround = false;
   x0 = Math.floor((b.x+1) / T); x1 = Math.floor((b.x + b.w - 2) / T);
-  y0 = Math.floor(b.y / T); y1 = Math.floor((b.y + b.h - 1) / T);
+  // Subpixel gravity must still detect feet on the tile below; a 1px inset
+  // toggled grounded state every other tick and weakened acceleration/braking.
+  y0 = Math.floor(b.y / T); y1 = Math.floor((b.y + b.h - .001) / T);
   if (b.vy > 0){
     for (let tx=x0; tx<=x1; tx++) if (solidAt(tx, y1)){ b.y = y1*T - b.h; b.vy = 0; b.onGround = true; break; }
   } else if (b.vy < 0){
@@ -822,7 +846,7 @@ function killZombie(z, dirSign){
 function hurtPlayer(srcX){
   const p = player;
   if (p.inv > 0 || effects.shield>0 || state!=='play') return;
-  p.health--; p.inv = 100; shake = 8;
+  p.health--; p.inv = 100; p.hurtFlash=12; shake = 8;
   if (L.boss && !L.boss.dead && Math.random() < .35) bossSay(1 + Math.floor(Math.random()*2));
   p.vx = (p.x + p.w/2 < srcX ? -5 : 5); p.vy = -6;
   snd('hurt'); gore(p.x+p.w/2, p.y+20, 6, '#b01818');
@@ -922,9 +946,10 @@ function updateBoss(){
     } else hurtPlayer(B.x + B.w/2);
   }
 }
+function registerHit(x,y){player.hitMark=9;player.hitX=x;player.hitY=y;}
 function damageBoss(n){
   const B = L.boss; if (!B || B.dead) return;
-  B.hp -= n; B.flash = 4;
+  B.hp -= n; B.flash = 4;registerHit(B.x+B.w/2,B.y+B.h/2);
   if (B.hp <= 0){
     B.hp = 0; B.dead = true; snd('bossdie'); shake = 20; bossSay(4, true);
     addScore(5000 + L.i*100, B.x + B.w/2, B.y);
@@ -936,12 +961,11 @@ function damageBoss(n){
 
 // ---------- Update ----------
 function update(){
-  if(shopOpen) return;
+  if(shopOpen || state==='pause') return;
   frame++;
   if (shake > 0) shake *= .85, shake < .3 && (shake = 0);
   if (state==='title' || state==='gameover' || state==='win'){ jumpPressed = false; return; }
   if (state==='intro'){ if (--stateTimer<=0) state='play'; jumpPressed = false; return; }
-  if (state==='pause') return;
   if (banner && --banner.t <= 0) banner = null;
   if (state==='dying'){
     player.vy += .5; player.y += player.vy;
@@ -967,15 +991,18 @@ function update(){
   const slippery=region && region.kind==='ice' && onStreet;
   const wading=region && region.kind==='water' && onStreet;
   // movement
-  const maxV = (run() ? 5.2 : 3.6)*(effects.haste>0?1.35:1)*(wading?.65:1), acc = p.onGround ? .32 : .22, fr = slippery?.025:p.onGround ? .28 : .08;
+  const maxV = (run() ? 5.2 : 3.6)*(effects.haste>0?1.35:1)*(wading?.65:1);
+  const reversing=(left() && p.vx>0)||(right() && p.vx<0);
+  const acc=p.onGround?(slippery?.24:reversing?.72:.50):.22;
+  const fr=slippery?.025:p.onGround?.50:.08;
   if (left() && !right()){ p.vx = Math.max(p.vx - acc, -maxV); p.face = -1; }
   else if (right() && !left()){ p.vx = Math.min(p.vx + acc, maxV); p.face = 1; }
   else { if (p.vx>0) p.vx = Math.max(0, p.vx-fr); else if (p.vx<0) p.vx = Math.min(0, p.vx+fr); }
   if (Math.abs(p.vx) > maxV) p.vx *= .94;
 
-  p.coyote = p.onGround ? 6 : p.coyote-1;
+  p.coyote = p.onGround ? 8 : p.coyote-1;
   if (p.onGround) p.dblUsed = false;
-  if (jumpPressed) p.buf = 7; else p.buf--;
+  if (jumpPressed) p.buf = 9; else p.buf--;
   if (p.buf>0 && p.coyote>0){ p.vy = -11.6 - Math.abs(p.vx)*.25 - (effects.boots>0 ? 2 : 0); p.buf=0; p.coyote=0; snd('jump'); }
   else if (jumpPressed && up.double && !p.dblUsed && p.coyote<=0){ p.vy = -10.5; p.dblUsed = true; p.buf = 0; snd('jump'); for (let k=0;k<6;k++) parts.push({kind:'puff', x:p.x+p.w/2, y:p.y+p.h, vx:(Math.random()-.5)*3, vy:Math.random()*1.5, t:20}); }
   jumpPressed = false;
@@ -983,6 +1010,8 @@ function update(){
   p.vy = Math.min(p.vy + (jumpHeld() && p.vy<0 ? .48 : .8)*(course.element==='gravity'?.78:course.element==='wind' && jumpHeld() && p.vy<0?.9:1), 13);
 
   // weapon
+  if(p.hitMark>0)p.hitMark--;
+  if(p.hurtFlash>0)p.hurtFlash--;
   if (p.fireCd > 0) p.fireCd--;
   if (p.flash > 0) p.flash--;
   if (p.recoil > 0) p.recoil -= .5;
@@ -993,7 +1022,10 @@ function update(){
 
   const fallV = p.vy, wasAir = !p.onGround;
   moveBody(p, hitBlock);
-  if (wasAir && p.onGround && fallV > 9) snd('land');
+  if(wasAir && p.onGround && fallV>5){
+    snd('land');
+    for(let k=0;k<6;k++)parts.push({kind:'puff',x:p.x+p.w/2,y:p.y+p.h-2,vx:(k-2.5)*.65,vy:-.4,t:14});
+  }
   if (frame % 75 === 0 && Math.random() < .55){ const near = L.zs.filter(z => z.alive && z.active && !z.dead && Math.abs(z.x - p.x) < 600); if (near.length){ const z = near[Math.floor(Math.random()*near.length)]; if (!(Math.random() < .55 && zombieSay(z))) snd('groan', z.type==='brute' ? 70 : z.type==='runner' ? 150 : 105); } }
   const minX = cam;
   if (p.x < minX) { p.x = minX; if (p.vx<0) p.vx=0; }
@@ -1071,6 +1103,7 @@ function update(){
     for (const z of L.zs){
       if (!z.alive || z.dead || !z.active || b.hit.has(z)) continue;
       if (b.x > z.x && b.x < z.x + z.w && b.y > z.y && b.y < z.y + z.h){
+        registerHit(b.x,b.y);
         if(b.slow)z.slow=180;
         z.hp -= b.dmg; z.flash = 4; b.hit.add(z); z.x += Math.sign(b.vx) * (z.type==='brute' ? .8 : 2.5);
         gore(b.x, b.y, 2);
@@ -1780,6 +1813,12 @@ function drawHUD(){
   }
   const active=SHOP_POWERS.filter(item=>effects[item.id]>0);
   active.forEach((item,i)=>sh(item.name.toUpperCase()+' '+Math.ceil(effects[item.id]/60)+'s',18,88+i*13,'#9fffba',8));
+  if(player.hitMark>0){
+    const x=player.hitX-cam,y=player.hitY;
+    cx.strokeStyle='#fff3b0';cx.lineWidth=2;cx.beginPath();
+    for(const sx of [-1,1])for(const sy of [-1,1]){cx.moveTo(x+sx*4,y+sy*4);cx.lineTo(x+sx*10,y+sy*10);}cx.stroke();
+  }
+  if(player.hurtFlash>0){cx.strokeStyle='rgba(255,80,70,'+(player.hurtFlash/18)+')';cx.lineWidth=6;cx.strokeRect(3,3,VW-6,VH-6);}
   // boss bar
   const B = L.boss;
   if (B && !B.dead){
@@ -1834,7 +1873,7 @@ function drawScreens(){
     centerText([['POWER-UPS: ' + upgradeList(), 380, 8, '#9cf09c']]);
   } else if (state==='pause'){
     cx.fillStyle='rgba(0,0,0,.6)'; cx.fillRect(0,0,VW,VH);
-    centerText([['PAUSED', 190, 24], ['POWER-UPS', 240, 10, '#f5b800'], [upgradeList(), 262, 8, '#9cf09c'], ['PRESS P TO RESUME', 310, 10, '#ccc']]);
+    centerText([['PAUSED', 190, 24], ['POWER-UPS', 240, 10, '#f5b800'], [upgradeList(), 262, 8, '#9cf09c'], ['PRESS P OR TAP TO RESUME', 310, 10, '#ccc']]);
   } else if (state==='gameover'){
     cx.fillStyle='#000'; cx.fillRect(0,0,VW,VH);
     centerText([['GAME OVER', 150, 28, '#ff4d5e'], ['THE HORDE GOT YOU ON LEVEL ' + (levelIdx+1), 196, 9, '#ccc'],
@@ -1885,6 +1924,7 @@ function loop(now){
   const view=window.Cargo3D;
   if(view && view.enabled){cx.clearRect(0,0,VW,VH);view.render(window.__game);}else drawLevel();
   drawHUD(); drawScreens();
+  document.getElementById('bPause').textContent=state==='pause'?'RESUME [P]':'PAUSE [P]';
   document.getElementById('courseStatus').textContent=state==='play' || state==='pause' ? L.info.course.name+' · '+L.info.course.hint : '';
   requestAnimationFrame(loop);
 }

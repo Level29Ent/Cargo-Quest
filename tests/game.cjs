@@ -5,11 +5,13 @@ assert.match(html,/canvas\{[^}]*image-rendering:crisp-edges;image-rendering:pixe
 let src=html.match(/<script>([\s\S]*?)<\/script>/)[1];
 const store={};const nodes={};const hudText=[];
 const drawing=new Proxy({setTransform(...args){this.transform=args;},fillText(text){hudText.push(text);}}, {get(target,key){return key in target?target[key]:()=>{};}});
-function el(){return {set width(v){this._width=v;drawing.imageSmoothingEnabled=true;},get width(){return this._width},set height(v){this._height=v;drawing.imageSmoothingEnabled=true;},get height(){return this._height},style:{},classList:{add(){},remove(){}},addEventListener(){},getContext(){return drawing},replaceChildren(){},append(){},setAttribute(){},focus(){},hidden:true};}
-const sandbox={console,Math,Set,Image:function(){},innerWidth:390,innerHeight:844,performance:{now:()=>0},requestAnimationFrame(){},setTimeout(){},addEventListener(){},document:{getElementById:id=>nodes[id]??=el(),createElement:()=>el(),querySelectorAll:()=>[]},localStorage:{getItem:k=>store[k]??null,setItem:(k,v)=>store[k]=v}};
+function el(){return {set width(v){this._width=v;drawing.imageSmoothingEnabled=true;},get width(){return this._width},set height(v){this._height=v;drawing.imageSmoothingEnabled=true;},get height(){return this._height},style:{},classList:{add(){},remove(){},toggle(){}},events:{},addEventListener(name,fn){this.events[name]=fn;},setPointerCapture(){},getContext(){return drawing},replaceChildren(){},append(){},setAttribute(){},focus(){},hidden:true};}
+const listeners={};
+const sandbox={console,Math,Set,Image:function(){},innerWidth:390,innerHeight:844,performance:{now:()=>0},requestAnimationFrame(){},setTimeout(){},addEventListener(name,fn){listeners[name]=fn;},document:{getElementById:id=>nodes[id]??=el(),createElement:()=>el(),querySelectorAll:()=>[],addEventListener(name,fn){listeners[name]=fn;}},localStorage:{getItem:k=>store[k]??null,setItem:(k,v)=>store[k]=v}};
 sandbox.window=sandbox;
-src=src.replace('window.__game =',`window.test={buildLevel,moveBody,newGame,update,openShop,closeShop,purchasePower,earnCoins,addBolt,killZombie,hurtPlayer,fire,spawnBoss,SHOP_POWERS,WEAPONS,selectWeapon,grantPower,COURSES,fit,drawHUD,
-get weaponIndex(){return weaponIndex},set frame(v){frame=v},
+src=src.replace('window.__game =',`window.test={buildLevel,moveBody,newGame,update,openShop,closeShop,purchasePower,earnCoins,addBolt,killZombie,hurtPlayer,fire,spawnBoss,SHOP_POWERS,WEAPONS,selectWeapon,grantPower,COURSES,fit,drawHUD,togglePause,releaseControls,
+get parts(){return parts},
+get frame(){return frame},get weaponIndex(){return weaponIndex},set frame(v){frame=v},
 get spits(){return spits},
 get wallet(){return wallet},get effects(){return effects},get bullets(){return bullets},get p(){return player},get L(){return L},set L(v){L=v},get state(){return state},set state(v){state=v},get time(){return time},get touch(){return touch},get keys(){return keys},jump(){jumpPressed=true}}; window.__game =`);
 vm.runInNewContext(src,sandbox);const t=sandbox.test;
@@ -69,7 +71,8 @@ t.purchasePower('shield');assert.equal(t.effects.shield,3600);
 for(let i=0;i<1800;i++)t.update();assert.equal(t.effects.shield,1800);
 for(const item of t.SHOP_POWERS.filter(item=>!['heal','time','shield'].includes(item.id)))assert.equal(t.effects[item.id],0,item.id+' expiry');
 const savedWallet=t.wallet;
-vm.runInNewContext(src,sandbox);assert.equal(sandbox.test.wallet,savedWallet,'wallet restored after reload');
+const reload={...sandbox,document:{...sandbox.document,getElementById:()=>el(),addEventListener(){}},addEventListener(){}};reload.window=reload;
+vm.runInNewContext(src,reload);assert.equal(reload.test.wallet,savedWallet,'wallet restored after reload');
 // All weapons have distinct shot patterns, damage, range, cooldown, color and/or status effects.
 t.newGame(0);t.state='play';
 assert.equal(t.WEAPONS.length,6);
@@ -120,6 +123,33 @@ assert.ok(groundSpeed('water')<groundSpeed('supply'));
 cleanRun(5);region('belt');const oldX=t.p.x;t.update();assert.equal(t.p.x,oldX+1);
 function airborne(stage){cleanRun(stage);t.L.info.course=t.COURSES[stage];t.p.onGround=false;t.p.y=250;t.p.vy=-5;t.touch.J=true;t.update();t.touch.J=false;return t.p.vy;}
 assert.ok(airborne(6)<airborne(0));assert.ok(airborne(3)<airborne(0));
+// Responsiveness targets at the unchanged 3.6px/frame walking speed.
+cleanRun();for(let f=0;f<30;f++){t.update();assert.equal(t.p.onGround,true,'stable subpixel floor contact');}
+cleanRun();t.touch.R=true;for(let f=0;f<8;f++)t.update();assert.equal(t.p.vx,3.6,'reach walk speed in eight ticks');
+t.touch.R=false;const brakingX=t.p.x;for(let f=0;f<8;f++)t.update();assert.equal(t.p.vx,0);assert.ok(t.p.x-brakingX<12,'short grounded stopping distance');
+cleanRun();t.p.vx=3.6;t.touch.L=true;for(let f=0;f<6;f++)t.update();assert.ok(t.p.vx<0,'reverse direction promptly');t.releaseControls();
+// Coyote grace still accepts a late press, but not an unlimited air jump.
+cleanRun();t.p.onGround=false;t.p.y=300;t.p.vy=1;t.p.coyote=7;t.touch.J=true;t.jump();t.update();assert.ok(t.p.vy<0,'late edge jump accepted');t.releaseControls();
+cleanRun();t.p.onGround=false;t.p.y=250;t.p.vy=1;t.p.coyote=0;t.touch.J=true;t.jump();t.update();assert.ok(t.p.vy>0,'no extra jump without upgrade');t.releaseControls();
+// Jump shortly before landing queues the next takeoff (must not be swallowed).
+cleanRun();t.p.onGround=false;t.p.y=318;t.p.vy=3;t.p.coyote=0;t.touch.J=true;t.jump();
+for(let f=0;f<6;f++)t.update();assert.ok(t.p.vy<0,'buffered landing jump fired');t.releaseControls();
+// Independent pointer ownership: releasing fire cannot cancel movement or another finger on move.
+cleanRun();const press=id=>({pointerId:id,preventDefault(){}});
+nodes.bR.events.pointerdown(press(11));nodes.bR.events.pointerdown(press(12));nodes.bF.events.pointerdown(press(13));
+assert.equal(t.touch.R,true);assert.equal(t.touch.F,true);
+nodes.bR.events.pointerup(press(11));assert.equal(t.touch.R,true);
+nodes.bF.events.pointercancel(press(13));assert.equal(t.touch.F,false);assert.equal(t.touch.R,true);
+nodes.bR.events.lostpointercapture(press(12));assert.equal(t.touch.R,false);
+// Focus loss releases all inputs and pauses the live simulation, timers included.
+nodes.bR.events.pointerdown(press(21));t.keys.f=true;listeners.blur();assert.equal(t.state,'pause');assert.equal(t.touch.R,false);assert.equal(t.keys.f,false);
+const pausedTime=t.time,pausedX=t.p.x,pausedFrame=t.frame;for(let i=0;i<90;i++)t.update();assert.equal(t.time,pausedTime);assert.equal(t.p.x,pausedX);assert.equal(t.frame,pausedFrame);
+t.togglePause();assert.equal(t.state,'play');assert.equal(t.touch.R,false);
+nodes.bF.events.pointerdown(press(22));sandbox.document.hidden=true;listeners.visibilitychange();assert.equal(t.state,'pause');assert.equal(t.touch.F,false);sandbox.document.hidden=false;
+// Hit confirmation, damage feedback and landing dust do not alter health/damage balance.
+cleanRun();const hitEnemy={alive:true,active:true,dead:false,flash:0,x:155,y:324,w:26,h:60,vx:0,vy:0,hp:20,speed:0,dir:-1,anim:0,type:'walker',pts:100};t.L.zs=[hitEnemy];t.fire();t.update();assert.ok(t.p.hitMark>0);assert.ok(hitEnemy.hp<20);
+cleanRun();t.hurtPlayer(t.p.x+100);assert.equal(t.p.hurtFlash,12);assert.equal(t.p.health,2);
+cleanRun();t.p.onGround=false;t.p.y=315;t.p.vy=9;t.update();assert.ok(t.parts.some(part=>part.kind==='puff'),'landing dust emitted');
 let platforms=0, crossings=0;
 for(let i=0;i<100;i++){const l=t.buildLevel(i);if(l.info.isBoss)continue;for(let x=0;x<l.W;x++)for(let y=0;y<14;y++)if(l.grid[y][x]==='='){assert.equal(y,9);platforms++;}}
 assert.ok(platforms>100);

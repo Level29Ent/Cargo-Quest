@@ -135,15 +135,17 @@ try {
       box(x,feet+h*.54,14,3,16,2,'gold');
       const w=window.__game.weapon;
       const length=w.name==='Railgun'?46:w.name==='Shotgun'?36:30;
-      box(x+face*25,feet+h*.51,15,length,7,9,'dark',0,'metal');
-      limb(x+face*27,feet+h*.48,x+face*24,feet+h*.38,15,5,'dark');
-      box(x+face*21,feet+h*.56,15,10,3,6,'silver',0,'metal');
-      shape('cylinder',x+face*(25+length/2),feet+h*.51,15,6,8,6,'silver',Math.PI/2,'metal',zAxis);
-      box(x+face*32,feet+h*.51,20,12,2,2,w.color,0,'glow');
+      const kick=body.recoil||0;
+      const gunX=x-face*kick;
+      box(gunX+face*25,feet+h*.51,15,length,7,9,'dark',0,'metal');
+      limb(gunX+face*27,feet+h*.48,gunX+face*24,feet+h*.38,15,5,'dark');
+      box(gunX+face*21,feet+h*.56,15,10,3,6,'silver',0,'metal');
+      shape('cylinder',gunX+face*(25+length/2),feet+h*.51,15,6,8,6,'silver',Math.PI/2,'metal',zAxis);
+      box(gunX+face*32,feet+h*.51,20,12,2,2,w.color,0,'glow');
       if(w.name==='Flamer'||w.name==='Plasma')orb(x-8,feet+h*.49,-10,14,23,13,w.color,'metal');
       if(body.flash>0){
-        shape('cone',x+face*(36+length/2),feet+h*.51,15,12,25,12,'gold',-face*Math.PI/2,'glow',zAxis);
-        orb(x+face*(34+length/2),feet+h*.51,15,10,10,10,'white','glow');
+        shape('cone',gunX+face*(36+length/2),feet+h*.51,15,12,25,12,'gold',-face*Math.PI/2,'glow',zAxis);
+        orb(gunX+face*(34+length/2),feet+h*.51,15,10,10,10,'white','glow');
       }
       if(window.__game.effects.shield>0){
         for(let j=0;j<10;j++){const a=j*Math.PI/5;orb(x+Math.cos(a)*24,feet+h*.5+Math.sin(a)*40,5,3,3,3,'teal','glow');}
@@ -317,7 +319,10 @@ try {
       box(b.x-b.vx*.8,448-b.y+b.vy*.8,10,Math.max(10,Math.abs(b.vx)*1.8),2,2,color,0,'glow');
     }
     for(const shot of game.spits)orb(shot.x,448-shot.y,4,12,12,12,'green','glow');
-    for(const p of game.parts.slice(-100))orb(p.x,448-p.y,8,4,4,4,p.kind==='gore'?'red':'gold',p.kind==='spark'?'glow':'matte');
+    for(const p of game.parts.slice(-100)){
+      const dust=p.kind==='puff',size=dust?Math.max(2,7*p.t/14):4;
+      orb(p.x,448-p.y,8,size,size,size,dust?'silver':p.kind==='gore'?'red':'gold',p.kind==='spark'?'glow':'matte');
+    }
     if(!(game.state==='play'&&player.inv>0&&frame%6<3))person(player,true);
     for(const b of batches.values()){
       b.mesh.count=b.count;b.mesh.instanceMatrix.needsUpdate=true;
