@@ -47,6 +47,16 @@ for(let stage=0;stage<100;stage++){
  maxCalls=Math.max(maxCalls,lastRenderer.info.render.calls);
  assert.ok(lastScene.children.some(m=>m.isMesh&&m.material.map?.isCanvasTexture),'generated sky texture present');
 }
+// Exercise carried cargo, unlocked finishes and boss warning/strike cues in all regions.
+for(const stage of [4,9,14,19,24]){
+ test.newGame(stage);test.spawnBoss();const level=test.L;
+ level.cargo.carried=true;Object.assign(level.boss,{signatureWarning:60,targetX:700,targets:[610,700,790]});
+ const game={L:level,cam:640,frame:200,player:test.p,effects:{},weapon:test.WEAPONS[0],flagY:64,bullets:[],spits:[],parts:[],state:'play',cosmetic:{outfit:'#31bcb7',skin:'#ffd25d'}};
+ world.window.__game=game;view.render(game);
+ assert.ok(lastScene.children.some(m=>m.isInstancedMesh&&m.count>0&&m.userData.readabilityRole==='cue'&&m.material.color.getHexString()==='ffd25d'),'boss warning is visible');
+ level.boss.signatureWarning=0;level.boss.strikeTicks=24;view.render(game);
+ for(const m of lastScene.children.filter(m=>m.isInstancedMesh))if(m.count)assert.ok(m.instanceMatrix.array.subarray(0,m.count*16).every(Number.isFinite));
+}
 // Explicit mixed obstacle/pit/hazard fixture: borders and warning phases remain distinct.
 const fixtureGame=world.window.__game;
 fixtureGame.L.grid[9].splice(5,8,'H','B','P','p','?','M','U','=');fixtureGame.L.grid[12][9]=' ';

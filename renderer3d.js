@@ -106,7 +106,7 @@ try {
     const x=body.x+body.w/2, feet=448-body.y-body.h;
     const h=body.h, width=body.w, face=isPlayer?body.face:body.dir||body.face||-1;
     const gait=Math.sin(body.anim||0)*(body.onGround===false?2:7);
-    const color=body.flash>0?'white':isPlayer?'purple':boss?'red':'zombie';
+    const color=body.flash>0?'white':isPlayer?(window.__game.cosmetic?.outfit||'purple'):boss?'red':'zombie';
     // A flattened contact decal gives feet a grounding cue without mobile shadow maps.
     if(body.onGround)orb(x,feet+.5,-2,width*1.7,1.5,32,'#17212c');
     limb(x-6,feet+h*.38,x-7+gait,feet+8,0,8,isPlayer?'purple':'dark');
@@ -126,7 +126,7 @@ try {
     if(isPlayer){
       // Three-point purple/green/gold jester cap, bells and ruffled collar.
       const sway=Math.sin((body.anim||0)*.7)*.10;
-      orb(x,feet+h*.96,0,width,9,26,'purple');
+      orb(x,feet+h*.96,0,width,9,26,window.__game.cosmetic?.outfit||'purple');
       shape('cone',x-10,feet+h+7,0,12,22,14,'purple',.6+sway,'matte',zAxis);
       shape('cone',x+10,feet+h+7,0,12,22,14,'green',-.6+sway,'matte',zAxis);
       shape('cone',x,feet+h+12,-3,10,25,12,'gold');
@@ -137,7 +137,7 @@ try {
       const length=w.name==='Railgun'?46:w.name==='Shotgun'?36:30;
       const kick=body.recoil||0;
       const gunX=x-face*kick;
-      box(gunX+face*25,feet+h*.51,15,length,7,9,'dark',0,'metal');
+      box(gunX+face*25,feet+h*.51,15,length,7,9,window.__game.cosmetic?.skin||'dark',0,'metal');
       limb(gunX+face*27,feet+h*.48,gunX+face*24,feet+h*.38,15,5,'dark');
       box(gunX+face*21,feet+h*.56,15,10,3,6,'silver',0,'metal');
       shape('cylinder',gunX+face*(25+length/2),feet+h*.51,15,6,8,6,'silver',Math.PI/2,'metal',zAxis);
@@ -152,6 +152,9 @@ try {
       }
     }else{
       box(x,feet+h*.58,13,width*.65,3,2,boss?'gold':'brick');
+      if(!body.dead && body.type==='shield')box(x+face*17,feet+h*.48,12,7,h*.65,20,body.guardBreak>0?'dark':'blue',0,'metal');
+      if(!body.dead && body.type==='thrower')orb(x+face*18,feet+h*.7,12,12,12,12,body.attack<35?'red':'orange','glow');
+      if(!body.dead && body.type==='thief'){box(x,feet+h*.65,14,20,5,4,'gold');box(x-face*8,feet+h*.5,-12,16,18,10,'gold');}
       if(boss)shape('cone',x,feet+h+8,0,width*.9,20,20,'gold');
     }
   }
@@ -304,6 +307,16 @@ try {
     }
     for(const cache of L.pickups||[])if(!cache.got){
       box(cache.x,448-cache.y,0,25,25,25,'teal',frame*.02);box(cache.x,448-cache.y,15,4,16,3,'white');box(cache.x,448-cache.y,15,16,4,3,'white');
+    }
+    if(L.cargo && !L.cargo.delivered){
+      const c=L.cargo,x=c.carried?player.x+player.w/2:c.x,y=c.carried?player.y-18:c.y;
+      box(x,448-y,6,26,26,24,'gold',0,'metal');box(x,448-y,20,4,26,2,'dark');box(x,448-y,20,26,4,2,'white');
+    }
+    if(L.boss && !L.boss.dead && (L.boss.signatureWarning>0 || L.boss.strikeTicks>0)){
+      const b=L.boss;for(const x of (L.info.loc.id==='pi'?b.targets:[b.x+b.w/2])){
+        box(x,67,6,52,5,34,b.strikeTicks>0?'#ff6565':'#ffd25d',0,'cue');
+        box(x,88,12,4,22,4,'#ffd25d',0,'cue');
+      }
     }
     if(L.flagX>0){
       box(L.flagX*32+15,224,0,4,288,4,'silver');
