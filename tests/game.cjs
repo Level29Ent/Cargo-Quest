@@ -7,9 +7,10 @@ const store={};const nodes={};const hudText=[];
 const drawing=new Proxy({setTransform(...args){this.transform=args;},fillText(text){hudText.push(text);}}, {get(target,key){return key in target?target[key]:()=>{};}});
 function el(){return {set width(v){this._width=v;drawing.imageSmoothingEnabled=true;},get width(){return this._width},set height(v){this._height=v;drawing.imageSmoothingEnabled=true;},get height(){return this._height},style:{},classList:{add(){},remove(){},toggle(){}},events:{},addEventListener(name,fn){this.events[name]=fn;},setPointerCapture(){},getContext(){return drawing},replaceChildren(){},append(){},setAttribute(){},focus(){},hidden:true};}
 const listeners={};
-const sandbox={console,Math,Set,Image:function(){},innerWidth:390,innerHeight:844,performance:{now:()=>0},requestAnimationFrame(){},setTimeout(){},addEventListener(name,fn){listeners[name]=fn;},document:{getElementById:id=>nodes[id]??=el(),createElement:()=>el(),querySelectorAll:()=>[],addEventListener(name,fn){listeners[name]=fn;}},localStorage:{getItem:k=>store[k]??null,setItem:(k,v)=>store[k]=v}};
+const sandbox={console,Math,Set,Image:function(){},innerWidth:390,innerHeight:844,performance:{now:()=>0},requestAnimationFrame(){},setTimeout(){},addEventListener(name,fn){listeners[name]=fn;},document:{getElementById:id=>nodes[id]??=el(),createElement:()=>el(),createTextNode:text=>({textContent:text}),querySelectorAll:()=>[],addEventListener(name,fn){listeners[name]=fn;}},localStorage:{getItem:k=>store[k]??null,setItem:(k,v)=>store[k]=v}};
 sandbox.window=sandbox;
-src=src.replace('window.__game =',`window.test={buildLevel,moveBody,newGame,update,openShop,closeShop,purchasePower,earnCoins,addBolt,killZombie,hurtPlayer,fire,spawnBoss,SHOP_POWERS,WEAPONS,selectWeapon,grantPower,COURSES,fit,drawHUD,togglePause,releaseControls,finishStage,updateCargo,dropCargo,equipCosmetic,medalCount,loadCampaign,saveCampaign,updateBoss,targetTicks,openCampaign,closeCampaign,
+src=src.replace('window.__game =',`window.test={buildLevel,moveBody,newGame,update,openShop,closeShop,purchasePower,earnCoins,addBolt,killZombie,hurtPlayer,fire,spawnBoss,SHOP_POWERS,WEAPONS,selectWeapon,grantPower,COURSES,fit,drawHUD,togglePause,releaseControls,finishStage,updateCargo,dropCargo,equipCosmetic,medalCount,loadCampaign,saveCampaign,updateBoss,targetTicks,openCampaign,closeCampaign,startDaily,startSurvival,dailyContract,finishMode,retryMode,spawnWave,updateSurvival,loadModeRecords,renderFieldGuide,modeStatus,drawScreens,
+get gameMode(){return gameMode},get activeRun(){return activeRun},get modeRecords(){return modeRecords},
 get campaign(){return campaign},get cosmetics(){return COSMETICS},
 get parts(){return parts},
 get frame(){return frame},get weaponIndex(){return weaponIndex},set frame(v){frame=v},
@@ -232,4 +233,46 @@ for(const stage of [4,9,14,19,24]){
 }
 assert.equal(signatures.size,5);
 console.log('PASS: cargo recovery/delivery and reward idempotency, independent medals, save validation/reload/storage failure, all cosmetic tiers, dispatch pause, tactical enemies, and five warned/enraged boss signatures.');
+// Daily Dispatch has stable date-based routes, a locked loadout and no campaign/economy side effects.
+const originalCampaign=JSON.stringify(t.campaign),originalWallet=t.wallet,originalCoinSave=store['cargoQuest2.coins'];
+const daily=t.dailyContract('2026-11-16');assert.equal(JSON.stringify(daily),JSON.stringify(t.dailyContract('2026-11-16')));
+assert.equal(daily.day,'2026-11-16');assert.notEqual(daily.stage%5,4,'daily never selects a boss');
+const dailyRoutes=new Set();for(let n=1;n<=28;n++){const d=t.dailyContract('2026-11-'+String(n).padStart(2,'0'));dailyRoutes.add(d.stage+':'+d.weapon);assert.notEqual(d.stage%5,4);assert.ok(d.weapon>=0&&d.weapon<6);}assert.ok(dailyRoutes.size>10);
+t.startDaily('2026-11-16');assert.equal(t.gameMode,'daily');assert.equal(t.weaponIndex,daily.weapon);assert.equal(t.p.health,3);assert.equal(t.L.pickups.length,0);assert.equal(t.L.i,daily.stage);
+t.selectWeapon((daily.weapon+1)%6);assert.equal(t.weaponIndex,daily.weapon);t.selectWeapon(daily.weapon);assert.match(nodes.bWeapon.textContent,/DAILY LOCKED/);
+t.state='play';assert.equal(t.purchasePower('shield'),false);t.openShop();assert.equal(nodes.shop.hidden,true);t.earnCoins(100);assert.equal(t.wallet,originalWallet);
+t.addBolt(0,0);assert.equal(store['cargoQuest2.coins'],originalCoinSave);assert.equal(JSON.stringify(t.campaign),originalCampaign);
+// A missed-cargo clear cannot replace a good delivery time; retries pin their original UTC day.
+t.L.runTicks=1000;t.L.cargo.carried=true;t.finishStage();assert.equal(t.state,'result');assert.equal(t.modeRecords.daily[daily.day].ticks,1000);assert.equal(t.modeRecords.daily[daily.day].cargo,true);
+const resultRecord=JSON.stringify(t.modeRecords);t.finishMode(true);assert.equal(JSON.stringify(t.modeRecords),resultRecord);t.drawScreens();assert.ok(hudText.includes('CARGO DELIVERED'));
+t.retryMode();assert.equal(t.activeRun.day,daily.day);assert.equal(t.state,'intro');t.L.runTicks=2000;t.L.cargo.carried=false;t.finishStage();assert.equal(t.modeRecords.daily[daily.day].ticks,1000);assert.equal(t.modeRecords.daily[daily.day].cargo,true);
+t.startDaily('2026-11-17');t.state='play';t.L.zs=[];t.L.elements=[];t.L.pickups=[];t.L.cargo.carried=true;t.p.x=t.L.flagX*32-28;t.update();assert.equal(t.state,'result','real daily flag completes without advancing into campaign');
+assert.equal(JSON.stringify(t.campaign),originalCampaign);assert.equal(t.wallet,originalWallet);
+// Daily failure, pause, retries and restart all keep campaign isolated.
+t.startDaily('2026-11-18');t.state='play';t.L.zs=[];t.p.health=1;t.p.inv=0;t.hurtPlayer(t.p.x+10);assert.equal(t.state,'dying');for(let f=0;f<160;f++)t.update();assert.equal(t.state,'result');assert.equal(t.modeRecords.daily['2026-11-18'],undefined);
+t.retryMode();t.state='play';t.openCampaign();const dailyTicks=t.L.runTicks;for(let n=0;n<30;n++)t.update();assert.equal(t.L.runTicks,dailyTicks);t.closeCampaign();
+// Survival is a closed, pit-free arena with telegraphed, capped waves and no stage timeout.
+t.startSurvival();assert.equal(t.gameMode,'survival');assert.equal(t.p.health,3);assert.equal(t.L.W,25);assert.equal(t.L.flagX,-1);assert.equal(t.L.zs.length,0);assert.equal(t.p.x,384);
+for(let x=0;x<25;x++)assert.equal(t.L.grid[12][x],'#');for(let y=0;y<12;y++){assert.equal(t.L.grid[y][0],'H');assert.equal(t.L.grid[y][24],'H');}
+t.state='play';t.openCampaign();const initialBreak=t.activeRun.breakTicks;for(let n=0;n<150;n++)t.update();assert.equal(t.activeRun.breakTicks,initialBreak);t.closeCampaign();
+for(let n=0;n<119;n++)t.update();assert.equal(t.L.zs.length,0);t.update();assert.equal(t.activeRun.wave,1);assert.equal(t.L.zs.length,5);assert.ok(t.L.zs.every(z=>Math.abs(z.x-t.p.x)>180));assert.match(t.modeStatus(),/WAVE 1/);
+for(let n=0;n<10;n++)t.update();assert.equal(t.time,999);assert.equal(sandbox.__game.cam,0);
+t.L.zs.forEach(z=>z.dead=true);t.p.health=1;t.spits.push({x:200,y:300});t.updateSurvival();assert.equal(t.activeRun.completed,1);assert.equal(t.p.health,2);assert.equal(t.spits.length,0);assert.equal(t.modeRecords.survival.wave,1);assert.equal(t.activeRun.breakTicks,120);
+// Advance many waves: counts and scaling remain bounded; third-wave reward is a real timed power.
+for(let wave=2;wave<=40;wave++){
+ t.spawnWave();assert.equal(t.activeRun.wave,wave);assert.ok(t.L.zs.length<=18);assert.ok(t.L.zs.every(z=>Number.isFinite(z.hp)&&Number.isFinite(z.speed)));
+ t.L.zs.forEach(z=>z.dead=true);t.updateSurvival();if(wave%3===0)assert.equal(t.effects.coolant,600);
+}
+assert.equal(t.modeRecords.survival.wave,40);t.state='play';t.p.health=1;t.p.inv=0;t.hurtPlayer(t.p.x+10);for(let n=0;n<160;n++)t.update();assert.equal(t.state,'result');assert.match(t.activeRun.result,/40 WAVES/);assert.equal(t.wallet,originalWallet);assert.equal(JSON.stringify(t.campaign),originalCampaign);
+const restoredModes=t.loadModeRecords();assert.equal(restoredModes.survival.wave,40);assert.equal(restoredModes.daily[daily.day].ticks,1000);
+// Limit daily history to 30 entries and sanitize malformed local records.
+for(let i=1;i<=31;i++){t.startDaily('2026-12-'+String(i).padStart(2,'0'));t.L.cargo.carried=true;t.L.runTicks=i;t.finishMode(true);}assert.equal(Object.keys(t.modeRecords.daily).length,30);
+store['cargoQuest2.modes.v1']=JSON.stringify({version:1,survival:{wave:-5,score:'bad'},daily:{'2026-11-16':{ticks:-2,cargo:'true',score:-1},'bad-key':{ticks:3}}});
+const cleanRecords=t.loadModeRecords();assert.equal(cleanRecords.survival.wave,0);assert.equal(cleanRecords.daily['2026-11-16'].ticks,null);assert.equal(cleanRecords.daily['2026-11-16'].cargo,false);assert.equal(cleanRecords.daily['bad-key'],undefined);
+store['cargoQuest2.modes.v1']='invalid json';assert.equal(t.loadModeRecords().survival.wave,0);
+const saveMode=sandbox.localStorage.setItem;sandbox.localStorage.setItem=()=>{throw Error('blocked')};t.startSurvival();t.activeRun.completed=3;t.finishMode();assert.equal(t.state,'result');sandbox.localStorage.setItem=saveMode;
+// Returning to campaign restores normal weapon selection, shopping and earning.
+t.newGame(0);t.state='play';t.selectWeapon(5);assert.equal(t.gameMode,'campaign');assert.equal(t.weaponIndex,5);t.earnCoins(1);assert.equal(t.wallet,originalWallet+1);t.openShop();assert.equal(nodes.shop.hidden,false);t.closeShop();
+t.renderFieldGuide();
+console.log('PASS: daily routes/loadout/retry/death/results, isolated saves and economy, capped survival waves/healing/coolant/pause/records, bounded history and malformed/blocked storage.');
 module.exports = { test: t };

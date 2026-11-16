@@ -57,6 +57,17 @@ for(const stage of [4,9,14,19,24]){
  level.boss.signatureWarning=0;level.boss.strikeTicks=24;view.render(game);
  for(const m of lastScene.children.filter(m=>m.isInstancedMesh))if(m.count)assert.ok(m.instanceMatrix.array.subarray(0,m.count*16).every(Number.isFinite));
 }
+// Extra modes share the real renderer, including the closed arena at high wave counts.
+for(const wave of [1,4,40]){
+ test.startSurvival();test.activeRun.wave=wave-1;test.spawnWave();
+ const game={L:test.L,cam:0,frame:200,player:test.p,effects:{},weapon:test.WEAPONS[0],flagY:64,bullets:[],spits:[],parts:[],state:'play'};
+ world.window.__game=game;view.render(game);
+ assert.ok(lastScene.children.filter(m=>m.isInstancedMesh&&m.count>0).length<100);
+ for(const m of lastScene.children.filter(m=>m.isInstancedMesh))if(m.count)assert.ok(m.instanceMatrix.array.subarray(0,m.count*16).every(Number.isFinite),'finite survival rendering');
+}
+test.startDaily('2026-11-16');
+const dailyGame={L:test.L,cam:0,frame:200,player:test.p,effects:{},weapon:test.WEAPONS[test.weaponIndex],flagY:64,bullets:[],spits:[],parts:[],state:'play'};
+world.window.__game=dailyGame;view.render(dailyGame);
 // Explicit mixed obstacle/pit/hazard fixture: borders and warning phases remain distinct.
 const fixtureGame=world.window.__game;
 fixtureGame.L.grid[9].splice(5,8,'H','B','P','p','?','M','U','=');fixtureGame.L.grid[12][9]=' ';
