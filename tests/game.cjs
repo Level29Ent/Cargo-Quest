@@ -9,7 +9,7 @@ function el(){return {set width(v){this._width=v;drawing.imageSmoothingEnabled=t
 const listeners={};
 const sandbox={console,Math,Set,Image:function(){},innerWidth:390,innerHeight:844,performance:{now:()=>0},requestAnimationFrame(){},setTimeout(){},addEventListener(name,fn){listeners[name]=fn;},document:{getElementById:id=>nodes[id]??=el(),createElement:()=>el(),createTextNode:text=>({textContent:text}),querySelectorAll:()=>[],addEventListener(name,fn){listeners[name]=fn;}},localStorage:{getItem:k=>store[k]??null,setItem:(k,v)=>store[k]=v}};
 sandbox.window=sandbox;
-src=src.replace('window.__game =',`window.test={buildLevel,moveBody,newGame,update,openShop,closeShop,purchasePower,earnCoins,addBolt,killZombie,hurtPlayer,fire,spawnBoss,SHOP_POWERS,WEAPONS,selectWeapon,grantPower,COURSES,fit,drawHUD,togglePause,releaseControls,finishStage,updateCargo,dropCargo,equipCosmetic,medalCount,loadCampaign,saveCampaign,updateBoss,targetTicks,openCampaign,closeCampaign,startDaily,startSurvival,dailyContract,finishMode,retryMode,spawnWave,updateSurvival,loadModeRecords,renderFieldGuide,modeStatus,drawScreens,startLevel,drawLevel,loop,
+src=src.replace('window.__game =',`window.test={buildLevel,moveBody,newGame,update,openShop,closeShop,purchasePower,earnCoins,addBolt,killZombie,hurtPlayer,fire,spawnBoss,SHOP_POWERS,WEAPONS,selectWeapon,grantPower,COURSES,fit,drawHUD,togglePause,releaseControls,finishStage,updateCargo,dropCargo,equipCosmetic,medalCount,loadCampaign,saveCampaign,updateBoss,targetTicks,openCampaign,closeCampaign,startDaily,startSurvival,dailyContract,finishMode,retryMode,spawnWave,updateSurvival,loadModeRecords,renderFieldGuide,modeStatus,drawScreens,startLevel,drawLevel,drawKingCake,loop,
 get gameMode(){return gameMode},get activeRun(){return activeRun},get modeRecords(){return modeRecords},
 get campaign(){return campaign},get cosmetics(){return COSMETICS},
 get parts(){return parts},
@@ -18,6 +18,16 @@ get spits(){return spits},
 get wallet(){return wallet},get effects(){return effects},get bullets(){return bullets},get p(){return player},get L(){return L},set L(v){L=v},get state(){return state},set state(v){state=v},get time(){return time},get touch(){return touch},get keys(){return keys},jump(){jumpPressed=true}}; window.__game =`);
 vm.runInNewContext(src,sandbox);const t=sandbox.test;
 assert.equal(t.SHOP_POWERS.length,14);
+// The fallback/HUD cake is an open oval, not a filled disc or spinning bolt.
+const cakeArcs=[];const originalEllipse=drawing.ellipse;
+drawing.ellipse=(...args)=>cakeArcs.push(args);
+t.drawKingCake(146,57);
+assert.equal(cakeArcs.length,9,'pastry, baked edge, icing and six sugar sections');
+for(const arc of cakeArcs){assert.ok(arc.every(Number.isFinite));assert.equal(arc[2],10.5);assert.equal(arc[3],8.5);}
+assert.equal(cakeArcs.filter(arc=>arc[6]===Math.PI*2).length,3,'three open stroked rings');
+drawing.ellipse=originalEllipse;
+assert.match(t.SHOP_POWERS.find(p=>p.id==='magnet').desc,/king cakes/);
+
 const cssWidth=()=>parseFloat(nodes.c.style.width);
 const cssHeight=()=>parseFloat(nodes.c.style.height);
 for(const [width,height,dpr] of [[390,844,3],[1280,800,2],[2560,1440,3],[800,600,1]]){

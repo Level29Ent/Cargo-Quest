@@ -29,9 +29,9 @@ for(let stage=0;stage<100;stage++){
  const level=test.L;level.zs.forEach(z=>{z.active=true;});
  const game={L:level,cam:0,frame:200,player:test.p,effects:{shield:30},weapon:test.WEAPONS[stage%6],flagY:64,
    bullets:[{x:260,y:330,vx:14,vy:0,color:'#ffab65'}],spits:[{x:350,y:330}],parts:[{x:300,y:330,kind:'spark'}],state:'play'};
- const beforeRender=JSON.stringify([level.grid,level.elements,level.pickups]);
+ const beforeRender=JSON.stringify([level.grid,level.elements,level.pickups,level.bolts]);
  world.window.__game=game;view.render(game);
- assert.equal(JSON.stringify([level.grid,level.elements,level.pickups]),beforeRender,'visual changes must not change collisions or elements');
+ assert.equal(JSON.stringify([level.grid,level.elements,level.pickups,level.bolts]),beforeRender,'visual changes must not change collisions or elements');
  const meshes=lastScene.children.filter(m=>m.isInstancedMesh&&m.count>0);
  assert.ok(meshes.some(m=>m.userData.readabilityRole==='scenery'),'muted scenery present in stage '+stage);
  assert.ok(meshes.some(m=>m.userData.readabilityRole==='cue'&&m.material.color.getHexString()==='7cfff0'),'cyan landing cue in stage '+stage);
@@ -68,6 +68,23 @@ for(const wave of [1,4,40]){
 test.startDaily('2026-11-16');
 const dailyGame={L:test.L,cam:0,frame:200,player:test.p,effects:{},weapon:test.WEAPONS[test.weaponIndex],flagY:64,bullets:[],spits:[],parts:[],state:'play'};
 world.window.__game=dailyGame;view.render(dailyGame);
+// One visible cake has a baked ring, white icing and six colored sugar sectors.
+const savedCakes=dailyGame.L.bolts;
+const cake={x:300,y:300,got:false};dailyGame.L.bolts=[cake];view.render(dailyGame);
+const cakeMeshes=()=>lastScene.children.filter(m=>m.isInstancedMesh&&m.count>0&&m.geometry.type==='TorusGeometry');
+let rings=cakeMeshes();
+assert.equal(rings.reduce((n,m)=>n+m.count,0),8);
+for(const mesh of rings){
+ assert.ok(mesh.geometry.parameters.radius>mesh.geometry.parameters.tube,'center hole stays open');
+ assert.equal(mesh.material.emissiveIntensity,0,'pastry is baked and iced, not metallic/glowing');
+}
+assert.equal(rings.find(m=>m.material.color.getHexString()==='fff3df').count,1,'white icing ring');
+for(const color of ['8c35bc','1baf55','f5c52e'])assert.equal(rings.filter(m=>m.material.color.getHexString()===color).reduce((n,m)=>n+m.count,0),2,'alternating sugar sections');
+cake.got=true;view.render(dailyGame);assert.equal(cakeMeshes().length,0,'collected cake disappears');
+cake.got=false;cake.x=1000;view.render(dailyGame);assert.equal(cakeMeshes().length,0,'offscreen cake is culled');
+dailyGame.parts=[{kind:'boltpop',x:300,y:300,t:20}];view.render(dailyGame);
+assert.equal(cakeMeshes().reduce((n,m)=>n+m.count,0),8,'crate reward uses the same cake');
+dailyGame.parts=[];dailyGame.L.bolts=savedCakes;
 // Explicit mixed obstacle/pit/hazard fixture: borders and warning phases remain distinct.
 const fixtureGame=world.window.__game;
 fixtureGame.L.grid[9].splice(5,8,'H','B','P','p','?','M','U','=');fixtureGame.L.grid[12][9]=' ';

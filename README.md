@@ -14,6 +14,8 @@ The renderer uses shared instanced geometry/materials, view-window culling, and 
 
 ## Visual readability
 
+Collectibles are oval king cakes inspired by traditional Mardi Gras pastries: golden-brown rings with open centers, white icing drips, and alternating purple, green and gold sugar. Both 3D and 2D views, the HUD counter and supply-crate reward pops use the cake artwork. Pickup positions, magnet range, scoring, the 50-cake extra life and saved coin balances are unchanged. Storm-course lightning hazards are still hazards.
+
 Background buildings, cars, trees and lamps use a muted blue-grey material pass; scenery does not receive the bright gameplay edge markings. Foreground solids use warm amber bodies with dark frames and cream top lips. Cyan edges identify landing surfaces; red end caps mark pit lips. Steam, lightning and thorn areas have permanent striped footprints and posts, with distinct idle/warning/active colors. The legend is visible above the game. These shape/pattern cues supplement color, and the 2D fallback keeps matching edge/stripe cues. Geometry, hitboxes, hazard timing and saved coins are unchanged.
 
 ## Controls
@@ -81,7 +83,7 @@ A separate closed, pit-free arena allows movement in both directions, with no sc
 
 Clearing a wave heals one heart and begins a two-second break. Hostile projectiles are removed and brief invulnerability protects the break. Every third completed wave grants ten seconds of Infinite Coolant. Cleared-wave and score records save locally at each wave clear and on defeat; this is not a resumable arena run. R restarts from wave 1. Results can be retried with Enter or tap. Pause, store restrictions and Dispatch freeze simulation as appropriate.
 
-Both modes are isolated from campaign checkpoints, campaign high scores, medals and the coin economy. No kill, bolt or completion in either mode changes the coin balance or grants extra lives. Returning to any campaign stage restores normal store and weapon behavior. Extra-mode records use the separate `cargoQuest2.modes.v1` key with validated loading and session-only fallback if storage is unavailable.
+Both modes are isolated from campaign checkpoints, campaign high scores, medals and the coin economy. No kill, king cake or completion in either mode changes the coin balance or grants extra lives. Returning to any campaign stage restores normal store and weapon behavior. Extra-mode records use the separate `cargoQuest2.modes.v1` key with validated loading and session-only fallback if storage is unavailable.
 
 ## Six free weapons
 
@@ -117,12 +119,12 @@ Element strips are placed only on intact open street, never across a pit. Timed 
 
 ## Coins and fourteen power-ups
 
-Bolts award 1 coin and defeated zombies award 3, separate from score and the 50-bolt extra-life counter. Free stage caches cycle through the power-up catalog. Existing boss upgrades are unchanged.
+King cakes award 1 coin and defeated zombies award 3, separate from score and the 50-cake extra-life counter. Free stage caches cycle through the power-up catalog. Existing boss upgrades are unchanged.
 
 | Power | Coins | Effect |
 | --- | ---: | --- |
 | Shield | 20 | Ignore enemy/element damage for 30s, not falls/timeout |
-| Coin Magnet | 15 | Collect bolts within five tiles for 30s |
+| Coin Magnet | 15 | Collect king cakes within five tiles for 30s |
 | Spring Boots | 20 | Higher ground jumps for 30s |
 | Freeze Wave | 25 | Freeze zombies, bosses and hostile projectiles for 30s |
 | Damage Boost | 20 | Double bullet damage for 30s |
