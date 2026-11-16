@@ -81,7 +81,7 @@
   <button id="bShop" aria-label="Open coin store">STORE · 0 coins</button>
   <section id="shop" role="dialog" aria-modal="true" aria-labelledby="shopTitle" hidden>
     <button id="shopClose">Close / Resume</button><h1 id="shopTitle">COIN STORE</h1>
-    <p id="wallet"></p><p>Earn 1 coin per bolt and 3 per zombie. Coins save on this device. No real-money purchases.</p>
+    <p id="wallet"></p><p>Earn 1 coin per king cake and 3 per zombie. Coins save on this device. No real-money purchases.</p>
     <p>Start a run to buy. Timed powers last 30 seconds of play; repeat purchases extend them. Powers reset on a new run.</p>
     <h2>FREE WEAPON LOADOUT</h2><div id="weapons"></div><h2>POWER-UPS</h2><p id="shopStatus" role="status" aria-live="polite"></p><div id="shopItems"></div>
   </section>
@@ -912,7 +912,7 @@ resetUpgrades();
 // Eight additional shop powers; existing boss rewards are unchanged.
 const SHOP_POWERS = [
   {id:'shield', name:'Shield', cost:20, desc:'Ignore enemy damage for 30 seconds.'},
-  {id:'magnet', name:'Coin Magnet', cost:15, desc:'Collect bolts within 5 tiles for 30 seconds.'},
+  {id:'magnet', name:'Coin Magnet', cost:15, desc:'Collect king cakes within 5 tiles for 30 seconds.'},
   {id:'boots', name:'Spring Boots', cost:20, desc:'Jump higher for 30 seconds.'},
   {id:'freeze', name:'Freeze Wave', cost:25, desc:'Freeze zombies, bosses and hostile shots for 30 seconds.'},
   {id:'damage', name:'Damage Boost', cost:20, desc:'Double bullet damage for 30 seconds.'},
@@ -1887,7 +1887,7 @@ function drawLevel(){
     cx.fillStyle = '#8a00a8'; cx.beginPath(); cx.moveTo(fx, flagY); cx.lineTo(fx-34, flagY+14); cx.lineTo(fx, flagY+28); cx.fill();
     cx.fillStyle = '#f5b800'; cx.font = '8px "Press Start 2P", monospace'; cx.textAlign='center'; cx.fillText('29', fx-11, flagY+17);
   }
-  for (const b of L.bolts) if (!b.got) drawBolt(b.x, b.y + Math.sin(frame*.08 + b.x)*2);
+  for (const b of L.bolts) if (!b.got) drawKingCake(b.x, b.y + Math.sin(frame*.08 + b.x)*2);
   for (const z of L.zs) if (z.alive && z.active) drawZombie(z);
   if (L.boss) drawBoss(L.boss);
   if (L.crate) drawCrate(L.crate);
@@ -1902,7 +1902,7 @@ function drawLevel(){
     else if (q.kind==='spark'){ cx.fillStyle = '#fff6a0'; cx.beginPath(); cx.arc(q.x, q.y, 9 - q.t, 0, 7); cx.fill(); }
     else if (q.kind==='puff'){ cx.fillStyle = 'rgba(255,255,255,.6)'; cx.beginPath(); cx.arc(q.x, q.y, 5, 0, 7); cx.fill(); }
     else if (q.kind==='medpop') drawMedkit(q.x, q.y);
-    else drawBolt(q.x, q.y);
+    else drawKingCake(q.x, q.y);
   }
   for (const b of bullets){
     cx.strokeStyle = b.color||'#ffe14a'; cx.lineWidth = 3; cx.beginPath(); cx.moveTo(b.x, b.y); cx.lineTo(b.x - b.vx*1.4, b.y - b.vy*1.4); cx.stroke();
@@ -1914,13 +1914,31 @@ function drawLevel(){
   cx.restore();
 }
 
-function drawBolt(x, y){
-  const w = Math.abs(Math.cos(frame*.07 + x*.01));
-  cx.save(); cx.translate(x, y); cx.scale(.35 + .65*w, 1);
-  cx.fillStyle = '#7a4a00'; cx.beginPath();
-  cx.moveTo(3,-13); cx.lineTo(-7,2); cx.lineTo(0,2); cx.lineTo(-3,13); cx.lineTo(8,-3); cx.lineTo(1,-3); cx.lineTo(5,-13); cx.closePath(); cx.fill();
-  cx.fillStyle = '#ffd84a'; cx.beginPath();
-  cx.moveTo(2,-11); cx.lineTo(-5,1); cx.lineTo(1,1); cx.lineTo(-1,10); cx.lineTo(6,-2); cx.lineTo(0,-2); cx.lineTo(3,-11); cx.closePath(); cx.fill();
+function drawKingCake(x, y){
+  cx.save(); cx.translate(x, y);
+  // Open oval ring, golden baked edges, white glaze and six sugared sections.
+  // No edge-on spin: the king-cake silhouette stays visible in the HUD too.
+  cx.lineCap='round';
+  cx.strokeStyle='#78451f'; cx.lineWidth=8;
+  cx.beginPath(); cx.ellipse(0,1,10.5,8.5,0,0,Math.PI*2); cx.stroke();
+  cx.strokeStyle='#d99b50'; cx.lineWidth=7;
+  cx.beginPath(); cx.ellipse(0,0,10.5,8.5,0,0,Math.PI*2); cx.stroke();
+  cx.strokeStyle='#fff3df'; cx.lineWidth=5.8;
+  cx.beginPath(); cx.ellipse(0,-.5,10.5,8.5,0,0,Math.PI*2); cx.stroke();
+  const sugars=['#8c35bc','#1baf55','#f5c52e'];
+  for(let i=0;i<6;i++){
+    const a=i*Math.PI/3;
+    cx.strokeStyle=sugars[i%3]; cx.lineWidth=4;
+    cx.beginPath(); cx.ellipse(0,-.5,10.5,8.5,0,a+.1,a+Math.PI/3-.1); cx.stroke();
+    const px=Math.cos(a+.45)*10.5,py=Math.sin(a+.45)*8.5;
+    cx.strokeStyle='#fff3df'; cx.lineWidth=1.6;
+    cx.beginPath(); cx.moveTo(px,py); cx.lineTo(px,py+2.5); cx.stroke();
+    for(let j=0;j<3;j++){
+      const t=a+.2+j*.23,r=1+(j%2)*.09;
+      cx.fillStyle=j===1?'#fff6dc':sugars[i%3];
+      cx.fillRect(Math.cos(t)*10.5*r-.4,Math.sin(t)*8.5*r-1,.8,1);
+    }
+  }
   cx.restore();
 }
 function drawMedkit(x, y){
@@ -2123,7 +2141,7 @@ function heart(x, y, full){
 function drawHUD(){
   if (!L || state==='title' || state==='intro' || state==='gameover' || state==='win') return;
   sh('CARGO QUEST', 18, 12); sh(pad(score, 7), 18, 30);
-  drawBolt(150, 57); sh('x' + pad(boltCount, 2), 162, 50, '#fff', 10);
+  drawKingCake(146, 57); sh('x' + pad(boltCount, 2), 166, 50, '#fff', 10);
   sh(gameMode==='survival'?'WAVE':gameMode==='daily'?'DAILY':'STAGE', 300, 12); sh(gameMode==='survival'?String(activeRun.wave):pad(levelIdx+1, 3) + '/100', 288, 30);
   sh('TIME', 490, 12);
   const tc = time <= 100 && frame%30<15 ? '#ff4d5e' : time <= 100 ? '#ffb3ba' : '#fff';

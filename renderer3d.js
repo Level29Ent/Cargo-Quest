@@ -26,7 +26,12 @@ try {
     box: new THREE.BoxGeometry(1,1,1),
     sphere: new THREE.SphereGeometry(.5,12,8),
     cylinder: new THREE.CylinderGeometry(.5,.5,1,12),
-    cone: new THREE.ConeGeometry(.5,1,12)
+    cone: new THREE.ConeGeometry(.5,1,12),
+    cake: new THREE.TorusGeometry(8.5,3.8,8,36),
+    icing: new THREE.TorusGeometry(8.5,2.9,8,36),
+    ...Object.fromEntries(Array.from({length:6},(_,i)=>[
+      'sugar'+i,new THREE.TorusGeometry(8.5,2.3,6,8,Math.PI/3-.13).rotateZ(i*Math.PI/3).scale(1.25,1,1)
+    ]))
   };
   // Generated once, locally: no extra image requests or full-screen post-processing.
   // Neither the orthographic camera nor CSS creates a resampling pass: the
@@ -96,6 +101,24 @@ try {
   }
   function orb(x,y,z,w,h,d,color,finish='matte'){
     shape('sphere',x,y,z,w,h,d,color,0,finish);
+  }
+  // Face-on oval pastry rings keep their center hole readable at pickup size.
+  // All cakes share instanced geometry; sugar sectors repeat purple/green/gold.
+  function kingCake(x,y){
+    shape('cake',x,y,5,1.25,1,1,'#c48238');
+    shape('icing',x,y+.5,7,1.25,1,1,'#fff3df');
+    const sugars=['#8c35bc','#1baf55','#f5c52e'];
+    for(let i=0;i<6;i++){
+      const angle=i*Math.PI/3;
+      shape('sugar'+i,x,y+.5,8.8,1,1,.7,sugars[i%3]);
+      // Small icing drips and sugar crystals break up the perfect torus outline.
+      const a=angle+.45,px=x+Math.cos(a)*10.6,py=y+Math.sin(a)*8.5;
+      orb(px,py-1,8,3,5,2,'#fff3df');
+      for(let j=0;j<3;j++){
+        const t=angle+.18+j*.23,r=8+(j%2)*1.5;
+        box(x+Math.cos(t)*r*1.25,y+.5+Math.sin(t)*r,10.6,.8,1.2,.7,j===1?'#fff3df':sugars[i%3],t);
+      }
+    }
   }
   function limb(x1,y1,x2,y2,z,width,color){
     const dx=x2-x1,dy=y2-y1;
@@ -302,8 +325,7 @@ try {
       if(e.kind==='gravity')box(e.x+e.w/2,140+Math.sin(frame*.03)*16,-65,24,24,24,'purple',frame*.02);
     }
     for(const coin of L.bolts)if(!coin.got&&coin.x>cam-30&&coin.x<cam+850){
-      shape('cylinder',coin.x,448-coin.y+Math.sin(frame*.08)*2,5,17,4,17,'gold',Math.PI/2,'metal',xAxis);
-      orb(coin.x,448-coin.y+Math.sin(frame*.08)*2,8,5,8,2,'gold','glow');
+      kingCake(coin.x,448-coin.y+Math.sin(frame*.08)*2);
     }
     for(const cache of L.pickups||[])if(!cache.got){
       box(cache.x,448-cache.y,0,25,25,25,'teal',frame*.02);box(cache.x,448-cache.y,15,4,16,3,'white');box(cache.x,448-cache.y,15,16,4,3,'white');
@@ -333,6 +355,7 @@ try {
     }
     for(const shot of game.spits)orb(shot.x,448-shot.y,4,12,12,12,'green','glow');
     for(const p of game.parts.slice(-100)){
+      if(p.kind==='boltpop'){kingCake(p.x,448-p.y);continue;}
       const dust=p.kind==='puff',size=dust?Math.max(2,7*p.t/14):4;
       orb(p.x,448-p.y,8,size,size,size,dust?'silver':p.kind==='gore'?'red':'gold',p.kind==='spark'?'glow':'matte');
     }
