@@ -588,7 +588,7 @@ function decorateCourse(level){
   level.elements=[];
   const kind=level.info.course.element;
   // Place elements only on uninterrupted, open street, never on pit landings or the exit.
-  for(let x=10+(level.i%3);x<level.W-18;x+=11+(level.i%5)){
+  for(let x=10+(level.i%3);x+3<=(level.info.isBoss?29:level.W-52);x+=11+(level.i%5)){
     if([0,1,2,3].some(k=>level.grid[12][x+k]!=='#' || level.grid[11][x+k]!==' ')) continue;
     level.elements.push({x:x*T,w:3*T,kind,phase:(x*13+level.i*19)%240});
     if(kind==='supply')level.grid[8][x+1]='?';
@@ -624,7 +624,7 @@ function buildLevel(i){
   info.course = COURSES[(i + Math.floor(i/10)) % COURSES.length];
   const rng = mkRng(i * 7919 + 13);
   const d = i / (TOTAL_LEVELS - 1);
-  const W = info.isBoss ? 45 : 150 + Math.floor(d * 90) + Math.floor(rng()*20);
+  const W = info.isBoss ? 55 : 190 + Math.floor(d * 112) + Math.floor(rng()*20);
   const g = Array.from({length:ROWS}, () => Array(W).fill(' '));
   for (let x=0;x<W;x++){ g[12][x]='#'; g[13][x]='#'; }
   const zs = [], bolts = [], props = [];
@@ -644,12 +644,12 @@ function buildLevel(i){
     plat(24,8-(Math.floor(i/5)%2),3); plat(37,8,3); plat(30,5+(Math.floor(i/10)%3),4);
     for (let y=0;y<12;y++) g[y][44]='H';
     props.push({type:'sign', x:5*T});
-    return decorateCourse({ grid:g, W, zs, bolts, props, info, i, d, flagX:-1, arenaX:20, boss:null, bossSpawned:false });
+    return decorateCourse({ grid:g, W, zs, bolts, props, info, i, d, flagX:-1, arenaX:20, exitX:48, boss:null, bossSpawned:false });
   }
 
   let x = 14;
   props.push({type:'sign', x:5*T});
-  while (x < W - 24){
+  while (x < W - 76){
     const r = rng();
     if (r < .17){ // flat + zombies
       const len = 6 + Math.floor(rng()*5);
@@ -690,6 +690,18 @@ function buildLevel(i){
       x += n*2 + 5;
     }
   }
+  // A protected 32-tile finish approach adds three guaranteed jump obstacles.
+  // Separate them by clear street; no timed damage or enemies on the runway.
+  const approach=W-52;
+  for(let tx=approach;tx<W;tx++){
+    for(let y=0;y<12;y++)g[y][tx]=' ';
+    g[12][tx]='#';g[13][tx]='#';
+  }
+  stairs(approach+2,2,1);stairs(approach+4,2,-1);
+  pipe(approach+12,2);row(approach+23,10,'BB');
+  boltRow(approach+2,8,4);boltRow(approach+12,7,2);boltRow(approach+23,7,3);
+  // Generator segments can overrun their start boundary; keep this approach safe.
+  for(let n=zs.length-1;n>=0;n--)if(zs[n].x>=approach*T)zs.splice(n,1);
   const flagX = W - 14;
   for (let k=flagX-6; k<W; k++){ for (let y=0;y<12;y++) if (g[y][k]!=='#') g[y][k]=' '; g[12][k]='#'; g[13][k]='#'; }
   g[11][flagX]='H';
@@ -1044,7 +1056,7 @@ function startLevel(i){
   levelIdx = i; L = buildLevel(i);
   player = { x:3*T, y:GROUND-60-2, w:24, h:60, vx:0, vy:0, onGround:false, face:1, anim:0, coyote:0, buf:0, inv:60,
              health:maxHealth(), heat:0, overheat:false, fireCd:0, flash:0, dblUsed:false, recoil:0, hitMark:0, hitX:0, hitY:0, hurtFlash:0 };
-  cam = 0; time = L.info.isBoss ? 250 : 300; timeAcc = 0; hurried = false;
+  cam = 0; time = L.info.isBoss ? 280 : 380; timeAcc = 0; hurried = false;
   popups = []; parts = []; bumps = []; bullets = []; spits = []; combo = 0; banner = null; bossBarShow = 0;
   stopBossVoice(); subtitle = null;
   flagY = 2*T; state = 'intro'; stateTimer = L.info.isBoss ? 150 : 120;
@@ -1512,32 +1524,55 @@ function update(){
       p.health = maxHealth();
       snd('power'); L.crate = null;
       banner = { txt:'POWER-UP', sub:name, t:200 };
-      finishStage();popups.push({x:c.x,y:c.y,t:180,txt:name});state = 'clear'; clearPhase = 2; stateTimer = 0;
+      finishStage();popups.push({x:c.x,y:c.y,t:180,txt:name});state = 'clear'; clearPhase = 1; stateTimer = 0;
+      // Open the arena wall only after the boss reward is collected.
+      for(let y=0;y<12;y++)L.grid[y][44]=' ';
+      releaseControls();bullets=[];spits=[];p.vx=0;p.face=1;
     }
   }
 
   if(gameMode==='survival' && activeRun.breakTicks===0)updateSurvival();
   // flag pole
   if (L.flagX > 0 && p.x + p.w >= L.flagX*T - 4){
-    finishStage();if(gameMode!=='campaign')return;state='clear'; clearPhase = 0; snd('flag');
+    finishStage();state='clear'; clearPhase = 0; snd('flag');releaseControls();bullets=[];spits=[];
     const h = Math.max(0, 11*T - (p.y+p.h));
     const bonus = h > 7*T ? 5000 : h > 5*T ? 2000 : h > 3*T ? 800 : h > T ? 400 : 100;
-    addScore(bonus, L.flagX*T + 20, p.y);
+    if(gameMode==='campaign')addScore(bonus, L.flagX*T + 20, p.y);
     p.x = L.flagX*T + 16 - p.w; p.vx = 0; p.vy = 0;
   }
   updateFx();
 }
 
+function throwConfetti(){
+  const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  if(reduced)return;
+  const door=L.exitX*T+100;
+  for(let k=0;k<36;k++){
+    const a=k*2.399+frame*.05;
+    parts.push({kind:'confetti',x:door+(k%2?85:-85),y:GROUND-110,vx:Math.cos(a)*3,vy:-3-(k%5),t:85+k%20,c:['#9a45d2','#30cb76','#ffd25d'][k%3],spin:a});
+  }
+}
+function startCelebration(){
+  if(L.celebration)return;
+  L.celebration={ticks:180};clearPhase=4;
+  banner={txt:'LAISSEZ LES BONS TEMPS ROULER!',sub:'SAFE HOUSE REACHED · HAPPY MARDI GRAS!',t:180};
+  snd('clear');throwConfetti();
+}
 function updateClear(){
   const p = player;
-  if (banner && --banner.t <= 0) banner = null;
   if (clearPhase===0){
     p.y = Math.min(p.y + 4, 11*T - p.h);
     flagY = Math.min(flagY + 4, 11*T - 34);
-    if (p.y >= 11*T - p.h && flagY >= 11*T - 34){ clearPhase = 1; p.face = 1; snd('clear'); }
+    if (p.y >= 11*T - p.h && flagY >= 11*T - 34){ clearPhase = 1; p.face = 1; }
   } else if (clearPhase===1){
-    p.x += 2.2; p.anim += .2; p.vy += .8; moveBody(p); p.vx = 0;
-    if (p.x > L.exitX*T + 40){ clearPhase = 2; }
+    const door=L.exitX*T+100;
+    p.face=1;p.vx=p.x+p.w/2<door?2.2:0;p.anim+=.2;p.vy=Math.min(p.vy+.8,10);moveBody(p);
+    cam=Math.min(L.W*T-VW,Math.max(cam,p.x-VW*.55));
+    if(p.x+p.w/2>=door && p.onGround){p.x=door-p.w/2;p.vx=0;startCelebration();}
+  } else if(clearPhase===4){
+    const party=L.celebration;
+    if(--party.ticks>0){if(party.ticks%30===0)throwConfetti();}
+    else {clearPhase=2;banner=null;if(gameMode==='daily'){state='result';return;}}
   } else if (clearPhase===2){
     if (time > 0){ const n = Math.min(time, 3); time -= n; score += n*50; if (frame%3===0) snd('tick'); }
     else { clearPhase = 3; stateTimer = banner ? Math.max(90, banner.t) : 90; }
@@ -1556,6 +1591,7 @@ function updateFx(){
   for (const q of parts){
     q.t--;
     if (q.kind==='brick' || q.kind==='gore' || q.kind==='shell'){ q.vy += .45; q.x += q.vx; q.y += q.vy; if (q.kind==='gore' && q.y > GROUND && solidAt(Math.floor(q.x/T),12)) { q.y = GROUND; q.vx = 0; q.vy = 0; } }
+    else if(q.kind==='confetti'){q.x+=q.vx;q.y+=q.vy;q.vy+=.12;q.spin+=.15;}
     else if (q.kind==='puff'){ q.x += q.vx; q.y += q.vy; }
     else if (q.kind==='boltpop' || q.kind==='medpop'){ q.vy += .55; q.y += q.vy; }
   }
@@ -1882,6 +1918,46 @@ function drawTile(t, x, y, tx, ty, gc){
   }
 }
 
+function drawSafeHouse(ex){
+  if(ex<cam-250 || ex>cam+VW+100)return;
+  const party=!!L.celebration;
+  cx.fillStyle='#23302e';cx.fillRect(ex-9,GROUND-6,218,9);
+  cx.fillStyle='#4a2864';cx.fillRect(ex,GROUND-168,200,164);
+  // Weatherboard facade, cream cornice and purple/green/gold balcony awning.
+  cx.fillStyle='#694583';for(let y=GROUND-160;y<GROUND-8;y+=12)cx.fillRect(ex,y,200,2);
+  cx.fillStyle='#f8dfaa';cx.fillRect(ex-8,GROUND-180,216,12);cx.fillRect(ex-5,GROUND-88,210,7);
+  cx.fillStyle='#203d38';cx.fillRect(ex-5,GROUND-171,210,8);
+  for(const dx of [20,147]){
+    cx.fillStyle='#ffdc83';cx.fillRect(ex+dx,GROUND-155,33,42);
+    cx.fillStyle='#173b33';cx.fillRect(ex+dx-9,GROUND-157,8,46);cx.fillRect(ex+dx+34,GROUND-157,8,46);
+    cx.fillStyle='#f8dfaa';cx.fillRect(ex+dx+15,GROUND-155,3,42);cx.fillRect(ex+dx,GROUND-136,33,3);
+  }
+  cx.fillStyle='#152b28';cx.fillRect(ex+76,GROUND-78,48,78);
+  cx.fillStyle=party?'#ffe3a0':'#ceaa57';cx.fillRect(ex+80,GROUND-74,40,74);
+  cx.fillStyle='#40335a';cx.fillRect(ex+86,GROUND-66,28,45);
+  cx.fillStyle='#ffd25d';cx.fillRect(ex+113,GROUND-35,3,3);
+  // Porch pillars, scrollwork balcony rail and tiled front steps.
+  for(const dx of [4,61,139,196]){cx.fillStyle='#f8dfaa';cx.fillRect(ex+dx-3,GROUND-94,6,90);}
+  cx.fillStyle='#131f2a';cx.fillRect(ex-7,GROUND-105,214,4);cx.fillRect(ex-7,GROUND-86,214,3);
+  for(let dx=0;dx<=200;dx+=12){cx.fillRect(ex+dx,GROUND-104,2,20);cx.beginPath();cx.arc(ex+dx+6,GROUND-96,4,0,Math.PI*2);cx.strokeStyle='#15212a';cx.lineWidth=1;cx.stroke();}
+  const colors=['#9a45d2','#30cb76','#ffd25d'];
+  for(let k=0;k<12;k++){
+    cx.fillStyle=colors[k%3];cx.beginPath();cx.moveTo(ex-8+k*18,GROUND-113);cx.lineTo(ex+10+k*18,GROUND-113);cx.lineTo(ex+1+k*18,GROUND-99);cx.fill();
+  }
+  // Draped bead garlands and warm porch lanterns, not flashing lights.
+  for(let k=0;k<31;k++){cx.fillStyle=colors[k%3];cx.beginPath();cx.arc(ex+k*6.5,GROUND-92+Math.sin(k/30*Math.PI)*8,2,0,7);cx.fill();}
+  for(const dx of [64,136]){cx.fillStyle='#162e29';cx.fillRect(ex+dx-5,GROUND-73,10,18);cx.fillStyle='#ffe3a0';cx.fillRect(ex+dx-3,GROUND-70,6,10);}
+  cx.fillStyle='#dfc797';cx.fillRect(ex+70,GROUND-4,60,4);cx.fillRect(ex+64,GROUND,72,4);
+  // Welcoming neighbors keep the doorway clear. Arms rise once the player arrives.
+  for(const [dx,i] of [[-20,0],[220,1]]){
+    const y=GROUND-6;
+    cx.fillStyle=colors[i];cx.fillRect(ex+dx-6,y-26,12,18);
+    cx.fillStyle='#dcae7d';cx.beginPath();cx.arc(ex+dx,y-33,6,0,7);cx.fill();
+    cx.strokeStyle=colors[i];cx.lineWidth=4;cx.beginPath();cx.moveTo(ex+dx-5,y-24);cx.lineTo(ex+dx-12,y-(party?39:16));cx.moveTo(ex+dx+5,y-24);cx.lineTo(ex+dx+12,y-(party?39:16));cx.stroke();
+    cx.fillStyle='#192635';cx.fillRect(ex+dx-6,y-9,4,9);cx.fillRect(ex+dx+2,y-9,4,9);
+  }
+  sh('SAFE HOUSE',ex+100,GROUND-166,'#fff3d2',9,'center');
+}
 function drawLevel(){
   drawBackground();
   const sx = shake ? (Math.random()-.5)*shake : 0, sy = shake ? (Math.random()-.5)*shake : 0;
@@ -1902,18 +1978,7 @@ function drawLevel(){
     cx.fillStyle=L.boss.strikeTicks>0?'#ff675f':'#ffd25d';
     for(const x of (L.info.loc.id==='pi'?L.boss.targets:[L.boss.x+L.boss.w/2])){cx.fillRect(x-26,GROUND-5,52,5);sh('!',x,GROUND-18,'#ffe08a',14,'center');}
   }
-  // safe-zone exit
-  if (L.flagX > 0){
-    const ex = L.exitX*T;
-    if (ex > cam - 250 && ex < cam + VW + 50){
-      cx.fillStyle = '#6a6a5a'; cx.fillRect(ex, GROUND-150, 200, 150);
-      cx.fillStyle = '#4a4a3e'; for (let r=0;r<5;r++) cx.fillRect(ex, GROUND-150 + r*30, 200, 3);
-      cx.fillStyle = '#c8b070'; for (let k=0;k<7;k++) { cx.beginPath(); cx.ellipse(ex + 14 + k*29, GROUND-156, 15, 8, 0, 0, 7); cx.fill(); }
-      cx.fillStyle = '#0e0a12'; cx.fillRect(ex+70, GROUND-80, 60, 80);
-      cx.fillStyle = '#1f6a3a'; cx.fillRect(ex+50, GROUND-125, 100, 26);
-      cx.fillStyle = '#fff'; cx.font = '10px "Press Start 2P", monospace'; cx.textAlign='center'; cx.fillText('SAFE ZONE', ex+100, GROUND-107);
-    }
-  }
+  if(L.exitX>0 && (L.flagX>0 || L.info.isBoss))drawSafeHouse(L.exitX*T);
   const tx0 = Math.max(0, Math.floor(cam/T)-1), tx1 = Math.min(L.W-1, Math.ceil((cam+VW)/T)+1);
   const gc = groundColors();
   for (let ty=0; ty<ROWS; ty++) for (let tx=tx0; tx<=tx1; tx++){
@@ -1957,6 +2022,7 @@ function drawLevel(){
     else if (q.kind==='shell'){ cx.fillStyle = '#d4a017'; cx.fillRect(q.x, q.y, 4, 2); }
     else if (q.kind==='spark'){ cx.fillStyle = '#fff6a0'; cx.beginPath(); cx.arc(q.x, q.y, 9 - q.t, 0, 7); cx.fill(); }
     else if (q.kind==='puff'){ cx.fillStyle = 'rgba(255,255,255,.6)'; cx.beginPath(); cx.arc(q.x, q.y, 5, 0, 7); cx.fill(); }
+    else if(q.kind==='confetti'){cx.save();cx.translate(q.x,q.y);cx.rotate(q.spin);cx.fillStyle=q.c;cx.fillRect(-2,-1,4,3);cx.restore();}
     else if(q.kind==='blast' || q.kind==='frostpulse'){
       cx.strokeStyle=q.kind==='blast'?'#ffb35d':'#a0fff2';cx.lineWidth=q.kind==='blast'?3:2;
       cx.beginPath();cx.arc(q.x,q.y,q.r*(1-q.t/(q.kind==='blast'?16:20)),0,Math.PI*2);cx.stroke();
@@ -2224,6 +2290,10 @@ function drawHUD(){
     cx.fillStyle = hc; cx.fillRect(691, 53, 90 * player.heat/100, 8);
     sh(L.info.street + ' · ' + L.info.loc.city, 400, 70, '#f5d77a', 8, 'center');
   }
+  if(window.Cargo3D?.enabled && L.exitX>0 && (L.flagX>0 || L.info.isBoss)){
+    const x=L.exitX*T+100-cam;
+    if(x>-100 && x<VW+100)sh('SAFE HOUSE',x,GROUND-166,'#fff3d2',9,'center');
+  }
   const active=SHOP_POWERS.filter(item=>effects[item.id]>0);
   active.forEach((item,i)=>sh(item.name.toUpperCase()+' '+Math.ceil(effects[item.id]/60)+'s',18+Math.floor(i/6)*250,88+(i%6)*13,'#9fffba',8));
   if(effects.barrier>0){sh('WARD READY',650,88,'#a0fff2',8);}
@@ -2318,7 +2388,12 @@ function drawScreens(){
     lines.forEach((l, i) => cx.fillText(l, 400, y0 + 18 + i*15));
     cx.textBaseline = 'alphabetic';
   }
-  if (banner && (state==='play' || state==='clear')){
+  if(state==='clear' && clearPhase===4){
+    cx.fillStyle='rgba(16,12,35,.88)';cx.fillRect(100,88,600,56);
+    sh('HAPPY MARDI GRAS!',400,98,'#ffd25d',18,'center');
+    sh('SAFE HOUSE REACHED · LET THE GOOD TIMES ROLL!',400,125,'#c2ffdb',9,'center');
+  }
+  if (banner && !(state==='clear' && clearPhase===4) && (state==='play' || state==='clear')){
     const a = Math.min(1, banner.t / 20);
     cx.globalAlpha = a;
     cx.fillStyle = 'rgba(0,0,0,.6)'; cx.fillRect(0, 150, VW, 84);
