@@ -27,7 +27,7 @@ const shapeTypes=new Set();let maxCalls=0;
 for(let stage=0;stage<100;stage++){
  test.newGame(stage);test.state='play';
  const level=test.L;level.zs.forEach(z=>{z.active=true;});
- const game={L:level,cam:0,frame:200,player:test.p,effects:{shield:30},weapon:test.WEAPONS[stage%6],flagY:64,
+ const game={L:level,cam:0,frame:200,player:test.p,effects:{shield:30},weapon:test.WEAPONS[stage%9],flagY:64,
    bullets:[{x:260,y:330,vx:14,vy:0,color:'#ffab65'}],spits:[{x:350,y:330}],parts:[{x:300,y:330,kind:'spark'}],state:'play'};
  const beforeRender=JSON.stringify([level.grid,level.elements,level.pickups,level.bolts]);
  world.window.__game=game;view.render(game);
@@ -56,6 +56,17 @@ for(const stage of [4,9,14,19,24]){
  assert.ok(lastScene.children.some(m=>m.isInstancedMesh&&m.count>0&&m.userData.readabilityRole==='cue'&&m.material.color.getHexString()==='ffd25d'),'boss warning is visible');
  level.boss.signatureWarning=0;level.boss.strikeTicks=24;view.render(game);
  for(const m of lastScene.children.filter(m=>m.isInstancedMesh))if(m.count)assert.ok(m.instanceMatrix.array.subarray(0,m.count*16).every(Number.isFinite));
+}
+// Every new enemy/weapon/effect takes the real geometry path, with finite transforms.
+for(const type of ['leaper','plated','medic']){
+ test.newGame(20);test.state='play';const z=test.makeZombie(300,type,'nola',()=>.5);
+ Object.assign(z,{active:true,hp:1,attack:15});test.L.zs=[z];
+ for(const w of test.WEAPONS.slice(6)){
+  const game={L:test.L,cam:0,frame:200,player:test.p,effects:{barrier:60},weapon:w,flagY:64,bullets:[],spits:[],parts:[{kind:'blast',x:250,y:330,r:78,t:8},{kind:'frostpulse',x:300,y:330,r:145,t:10}],state:'play'};
+  world.window.__game=game;view.render(game);
+  for(const mesh of lastScene.children.filter(m=>m.isInstancedMesh&&m.count>0))assert.ok(mesh.instanceMatrix.array.subarray(0,mesh.count*16).every(Number.isFinite));
+  assert.ok(lastScene.children.filter(m=>m.isInstancedMesh&&m.count>0).length<100);
+ }
 }
 // Extra modes share the real renderer, including the closed arena at high wave counts.
 for(const wave of [1,4,40]){

@@ -9,7 +9,7 @@ function el(){return {set width(v){this._width=v;drawing.imageSmoothingEnabled=t
 const listeners={};
 const sandbox={console,Math,Set,Image:function(){},innerWidth:390,innerHeight:844,performance:{now:()=>0},requestAnimationFrame(){},setTimeout(){},addEventListener(name,fn){listeners[name]=fn;},document:{getElementById:id=>nodes[id]??=el(),createElement:()=>el(),createTextNode:text=>({textContent:text}),querySelectorAll:()=>[],addEventListener(name,fn){listeners[name]=fn;}},localStorage:{getItem:k=>store[k]??null,setItem:(k,v)=>store[k]=v}};
 sandbox.window=sandbox;
-src=src.replace('window.__game =',`window.test={buildLevel,moveBody,newGame,update,openShop,closeShop,purchasePower,earnCoins,addBolt,killZombie,hurtPlayer,fire,spawnBoss,SHOP_POWERS,WEAPONS,selectWeapon,grantPower,COURSES,fit,drawHUD,togglePause,releaseControls,finishStage,updateCargo,dropCargo,equipCosmetic,medalCount,loadCampaign,saveCampaign,updateBoss,targetTicks,openCampaign,closeCampaign,startDaily,startSurvival,dailyContract,finishMode,retryMode,spawnWave,updateSurvival,loadModeRecords,renderFieldGuide,modeStatus,drawScreens,startLevel,drawLevel,drawKingCake,loop,
+src=src.replace('window.__game =',`window.test={buildLevel,moveBody,newGame,update,openShop,closeShop,purchasePower,earnCoins,addBolt,killZombie,hurtPlayer,fire,spawnBoss,SHOP_POWERS,WEAPONS,selectWeapon,grantPower,COURSES,fit,drawHUD,togglePause,releaseControls,finishStage,updateCargo,dropCargo,equipCosmetic,medalCount,loadCampaign,saveCampaign,updateBoss,targetTicks,openCampaign,closeCampaign,startDaily,startSurvival,dailyContract,finishMode,retryMode,spawnWave,updateSurvival,loadModeRecords,renderFieldGuide,modeStatus,drawScreens,startLevel,drawLevel,drawKingCake,makeZombie,detonate,clearShot,loop,
 get gameMode(){return gameMode},get activeRun(){return activeRun},get modeRecords(){return modeRecords},
 get campaign(){return campaign},get cosmetics(){return COSMETICS},
 get parts(){return parts},
@@ -17,7 +17,7 @@ get frame(){return frame},get weaponIndex(){return weaponIndex},set frame(v){fra
 get spits(){return spits},
 get wallet(){return wallet},get effects(){return effects},get bullets(){return bullets},get p(){return player},get L(){return L},set L(v){L=v},get state(){return state},set state(v){state=v},get time(){return time},get touch(){return touch},get keys(){return keys},jump(){jumpPressed=true}}; window.__game =`);
 vm.runInNewContext(src,sandbox);const t=sandbox.test;
-assert.equal(t.SHOP_POWERS.length,14);
+assert.equal(t.SHOP_POWERS.length,18);
 // The fallback/HUD cake is an open oval, not a filled disc or spinning bolt.
 const cakeArcs=[];const originalEllipse=drawing.ellipse;
 drawing.ellipse=(...args)=>cakeArcs.push(args);
@@ -87,7 +87,7 @@ const reload={...sandbox,document:{...sandbox.document,getElementById:()=>el(),a
 vm.runInNewContext(src,reload);assert.equal(reload.test.wallet,savedWallet,'wallet restored after reload');
 // All weapons have distinct shot patterns, damage, range, cooldown, color and/or status effects.
 t.newGame(0);t.state='play';
-assert.equal(t.WEAPONS.length,6);
+assert.equal(t.WEAPONS.length,9);
 const shotSignatures=new Set();
 for(let i=0;i<t.WEAPONS.length;i++){
  t.selectWeapon(i);const weapon=t.WEAPONS[i], before=t.bullets.length;t.fire();
@@ -97,7 +97,7 @@ for(let i=0;i<t.WEAPONS.length;i++){
  if(weapon.slow)assert.equal(emitted[0].slow,true);
  shotSignatures.add(JSON.stringify([emitted.length,emitted[0].dmg,emitted[0].life,t.p.fireCd]));
 }
-assert.equal(shotSignatures.size,6);t.selectWeapon(100);assert.equal(t.weaponIndex,5);
+assert.equal(shotSignatures.size,9);t.selectWeapon(100);assert.equal(t.weaponIndex,8);
 function cleanRun(stage=0){t.newGame(stage);t.state='play';t.L.zs=[];t.L.bolts=[];t.L.pickups=[];t.L.elements=[];t.p.onGround=true;t.p.y=324;t.p.inv=0;}
 cleanRun();t.grantPower('vampire');t.p.health=1;
 for(let i=0;i<3;i++)t.killZombie({dead:false,active:false,pts:100,x:500,y:320,w:24,h:60},1);
@@ -177,7 +177,7 @@ for(let i=0;i<100;i++){
  }
 }
 assert.ok(crossings>100);
-console.log('PASS: original jump failure reproduced; fixed normal jump lands; '+crossings+' simulated crossings, '+platforms+' platform tiles across 100 stages checked; six weapon patterns, 14 powers, 10 course mechanics, 100 distinct stage configurations, costs, persistence, pause and expiry checked.');
+console.log('PASS: original jump failure reproduced; fixed normal jump lands; '+crossings+' simulated crossings, '+platforms+' platform tiles across 100 stages checked; nine weapon patterns, 18 powers, 10 course mechanics, 100 distinct stage configurations, costs, persistence, pause and expiry checked.');
 
 // Cargo contracts and campaign medals are independent, idempotent and persisted.
 t.campaign.stages={};t.saveCampaign();
@@ -212,7 +212,7 @@ for(let i=0;i<100;i++){
  assert.equal(l.cargo.carried,false);assert.equal(l.runTicks,0);
  for(const z of l.zs){variants.add(z.type);if(z.type==='thrower'){assert.notEqual(l.grid[8][Math.floor(z.x/32)],' ');perched++;}}
 }
-for(const kind of ['shield','thief','thrower'])assert.ok(variants.has(kind));assert.ok(perched>0);
+for(const kind of ['shield','thief','thrower','leaper','plated','medic'])assert.ok(variants.has(kind));assert.ok(perched>0);
 // Shield blocks the first frontal round, then visibly staggers; rear shots deal damage.
 function enemy(type){return {alive:true,active:true,dead:false,flash:0,x:155,y:324,w:26,h:60,vx:0,vy:0,hp:20,maxHp:20,speed:0,dir:-1,anim:0,type,pts:100,onGround:true,attack:1};}
 cleanRun();const guard=enemy('shield');t.L.zs=[guard];t.fire();t.update();assert.equal(guard.hp,20);assert.equal(guard.guardBreak,45);t.fire();t.update();assert.ok(guard.hp<20,'follow-up hits staggered shield');
@@ -354,6 +354,54 @@ audit('fatal street hazard wins over a healing pickup and finish flag',()=>{
 audit('left-facing close shots and fast shots use the swept path',()=>{
  cleanRun();t.p.x=200;t.p.face=-1;const z=enemy('walker');Object.assign(z,{x:165,speed:0});t.L.zs=[z];t.fire();t.update();assert.ok(z.hp<20);
  cleanRun();const fastTarget=enemy('walker');Object.assign(fastTarget,{x:200,w:12,speed:0});t.L.zs=[fastTarget];t.fire();t.bullets[0].vx=150;t.update();assert.ok(fastTarget.hp<20,'fast projectile does not tunnel through a narrow target');
+});
+function combatRoom(){
+ cleanRun();t.L.grid=Array.from({length:14},(_,y)=>Array(50).fill(y>=12?'#':' '));t.L.W=50;t.L.flagX=-1;t.L.info.isBoss=false;
+}
+audit('new powers have distinct effects, consume or expire, and respect pause',()=>{
+ combatRoom();t.grantPower('barrier');t.hurtPlayer(200);assert.equal(t.p.health,3);assert.equal(t.effects.barrier,0);assert.equal(t.p.inv,45);
+ t.p.inv=0;t.hurtPlayer(200);assert.equal(t.p.health,2,'ward only blocks once');
+ combatRoom();t.grantPower('airhop');t.p.onGround=false;t.p.coyote=0;t.p.y=240;t.touch.J=true;t.jump();t.update();assert.ok(t.p.vy<-9);assert.equal(t.p.dblUsed,true);
+ t.touch.J=false;t.update();t.touch.J=true;t.jump();t.update();assert.ok(t.p.vy>-9,'air step cannot be spammed');
+ combatRoom();t.selectWeapon(1);t.fire();const heat=t.p.heat,spread=t.bullets[0].vy;
+ t.p.heat=0;t.grantPower('focus');t.fire();assert.equal(t.p.heat,heat/2);assert.equal(t.bullets.at(-5).vy,spread/2);
+ combatRoom();const target=enemy('walker');target.x=200;t.L.zs=[target];t.grantPower('pulse');t.effects.pulse=121;t.update();assert.ok(target.slow>=179);
+ const duration=t.effects.pulse;t.openShop();for(let i=0;i<150;i++)t.update();assert.equal(t.effects.pulse,duration);t.closeShop();
+ combatRoom();const blocked=enemy('walker');blocked.x=210;t.L.zs=[blocked];t.L.grid[10][5]='H';t.L.grid[11][5]='H';t.effects.pulse=121;t.update();assert.ok(!blocked.slow,'pulse cannot cross a wall');
+ combatRoom();t.effects.airhop=1;t.update();assert.equal(t.effects.airhop,0);
+});
+audit('new weapons preserve cooldown/heat, arc, pierce and explode exactly once',()=>{
+ combatRoom();t.selectWeapon(8);t.fire();assert.equal(t.bullets[0].gravity,.18);assert.equal(t.bullets[0].vy,-3);
+ const cd=t.p.fireCd,heat=t.p.heat;t.selectWeapon(6);assert.equal(t.p.fireCd,cd);assert.equal(t.p.heat,heat,'switching cannot bypass heat');
+ combatRoom();t.selectWeapon(8);const near=enemy('walker'),far=enemy('walker');far.x=200;t.L.zs=[near,far];t.fire();t.update();t.update();
+ assert.equal(near.hp,16,'direct grenade target receives splash once, not direct plus splash');assert.equal(far.hp,16,'nearby target receives splash');assert.equal(t.bullets.length,0);
+ combatRoom();const target=enemy('walker');target.x=240;t.L.zs=[target];t.selectWeapon(8);t.fire();const fuse=t.bullets[0];Object.assign(fuse,{x:200,y:345,originX:200,originY:345,life:1});t.update();assert.equal(target.hp,16,'fuse expiry detonates');t.detonate(fuse);assert.equal(target.hp,16,'cannot detonate twice');
+ combatRoom();const blocked=enemy('walker');blocked.x=220;t.L.zs=[blocked];t.L.grid[10][6]='H';t.L.grid[11][6]='H';
+ t.detonate({x:180,y:350,dmg:4,blast:78,life:1});assert.equal(blocked.hp,20,'blast cannot cross terrain');
+ combatRoom();const plated=enemy('plated');t.L.zs=[plated];t.fire();t.update();assert.equal(plated.hp,19.5,'plating halves a standard round');
+ combatRoom();const armored=enemy('plated');t.L.zs=[armored];t.selectWeapon(7);t.fire();t.update();assert.ok(armored.hp<=18.2,'crossbow bypasses plating');
+});
+audit('new zombies telegraph jumps, heal allies with limits, and join later waves',()=>{
+ combatRoom();const hopper=t.makeZombie(300,'leaper','nola',()=>.5);hopper.active=true;hopper.onGround=true;hopper.attack=30;t.L.zs=[hopper];
+ for(let n=0;n<29;n++){t.update();assert.ok(hopper.vy>=0,'leaper warns before takeoff');}t.update();assert.ok(hopper.vy<0,'leaper launches after windup');
+ combatRoom();const frozen=t.makeZombie(300,'leaper','nola',()=>.5);Object.assign(frozen,{active:true,onGround:true,attack:15});t.L.zs=[frozen];t.effects.freeze=60;t.update();assert.equal(frozen.attack,15);
+ combatRoom();const medic=t.makeZombie(350,'medic','nola',()=>.5),ally=enemy('walker');Object.assign(medic,{active:true,onGround:true,attack:1,hp:2});Object.assign(ally,{x:280,hp:10});t.L.zs=[medic,ally];t.update();assert.equal(ally.hp,11);assert.equal(medic.hp,2,'medic never heals itself');assert.equal(medic.attack,180);
+ medic.attack=1;ally.hp=ally.maxHp;t.update();assert.equal(ally.hp,ally.maxHp,'healing is capped');
+ combatRoom();const m=t.makeZombie(350,'medic','nola',()=>.5),a=enemy('walker');Object.assign(m,{active:true,attack:1});Object.assign(a,{x:280,hp:10});t.L.zs=[m,a];for(const y of [10,11])t.L.grid[y][10]='H';t.update();assert.equal(a.hp,10,'medic cannot heal through terrain');
+ const roster=new Set();t.startSurvival();for(let n=0;n<10;n++){t.spawnWave();for(const z of t.L.zs)roster.add(z.type);}for(const type of ['leaper','plated','medic'])assert.ok(roster.has(type));
+ t.newGame(0);assert.equal(Object.keys(t.effects).length,0,'new effects do not leak to a new campaign');
+});
+audit('new weapon shortcuts cycle in both directions and preserve daily lock',()=>{
+ combatRoom();const key=k=>listeners.keydown({key:k,repeat:false,preventDefault(){}});
+ key('9');assert.equal(t.weaponIndex,8);key('q');assert.equal(t.weaponIndex,0);key('e');assert.equal(t.weaponIndex,8);key('7');assert.equal(t.weaponIndex,6);
+ t.startDaily('2026-11-16');const locked=t.weaponIndex;key('q');key('e');key('9');assert.equal(t.weaponIndex,locked);
+});
+audit('grenade wall impacts and boss hits detonate once; blasts draw in fallback',()=>{
+ combatRoom();t.L.grid[10][5]='H';t.L.grid[11][5]='H';const target=enemy('walker');target.x=200;t.L.zs=[target];t.selectWeapon(8);t.fire();t.update();t.update();t.update();assert.equal(t.bullets.length,0);assert.equal(target.hp,20,'wall absorbs the grenade and blocks splash');assert.ok(t.parts.some(p=>p.kind==='blast'));t.drawLevel();
+ combatRoom();t.p.x=600;t.spawnBoss();const b=t.L.boss;Object.assign(b,{x:659,y:290,signatureCd:999,mode:'walk',timer:999,speed:0});const hp=b.hp;t.selectWeapon(8);t.fire();t.update();t.update();assert.equal(b.hp,hp-4,'boss takes only one blast');
+});
+audit('air reversals respond sooner without changing top speed',()=>{
+ combatRoom();t.p.onGround=false;t.p.y=250;t.p.vx=2;t.touch.L=true;t.update();assert.ok(t.p.vx<=1.62,'stronger airborne direction reversal');t.touch.L=false;
 });
 if(auditFailures.length)throw Error('AUDIT FAILURES\n'+auditFailures.join('\n'));
 module.exports = { test: t };

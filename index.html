@@ -92,7 +92,7 @@
     <p>Continue restarts your saved stage with a fresh loadout and three lives. Any stage remains playable. Saves stay on this browser; no account or cloud sync.</p>
     <h2>EXTRA MODES</h2><p id="modeRecords"></p>
     <button id="startDaily">Daily Dispatch</button> <button id="startSurvival">Survival Arena</button>
-    <p>Daily: one UTC-date route, fixed weapon, one attempt-life. Bring the cargo home. Survival: endless waves in a closed arena, all six weapons, one attempt-life. Both modes disable the store and coin earning; no campaign progress or medals change. Records are local to this browser, not online rankings.</p>
+    <p>Daily: one UTC-date route, fixed weapon, one attempt-life. Bring the cargo home. Survival: endless waves in a closed arena, all nine weapons, one attempt-life. Both modes disable the store and coin earning; no campaign progress or medals change. Records are local to this browser, not online rankings.</p>
     <details id="fieldGuide"><summary>FIELD GUIDE · enemies, bosses and mode rules</summary><div id="guideEntries"></div></details>
     <h2>DELIVERY CONTRACT</h2><p>Find the gold CARGO crate, carry it to the flag (or claim the boss reward). Thieves can knock it loose: recover the dropped crate. Cargo never reduces movement or weapon strength.</p>
     <p>Three separate medals per stage: CLEAR, SPEED, CARGO. Earn them across different runs. First cargo delivery pays 25 base coins (Double Coins applies); delivery grades are GOLD (speed target) or SILVER. Speed uses active play time, not bought timer refills.</p>
@@ -467,7 +467,8 @@ addEventListener('keydown', e => {
   if(k==='c' && !e.repeat){openCampaign();return;}
   if (k==='b'){ openShop(); return; }
   if (k==='q' && !e.repeat) cycleWeapon();
-  if (/^[1-6]$/.test(k)) selectWeapon(Number(k)-1);
+  if (k==='e' && !e.repeat) selectWeapon((weaponIndex+WEAPONS.length-1)%WEAPONS.length);
+  if (/^[1-9]$/.test(k)) selectWeapon(Number(k)-1);
   if ([' ','arrowup','arrowdown','arrowleft','arrowright'].includes(k)) e.preventDefault();
   if (!keys[k] && (k===' '||k==='w'||k==='arrowup')) jumpPressed = true;
   keys[k] = true;
@@ -603,7 +604,9 @@ function decorateCourse(level){
   level.runTicks=0;level.recorded=false;
   // Deterministic tactical variants; keep the original layouts and jump routes intact.
   if(!level.info.isBoss)level.zs.forEach((z,n)=>{
-    if(level.i>=2 && n%4===0){z.type='shield';z.hp=3;z.maxHp=3;}
+    const extra=level.i>=8 && n%5===3?(level.i>=16 && n%3===0?'medic':level.i>=12 && n%2===0?'plated':'leaper'):null;
+    if(extra){const replacement=makeZombie(z.x,extra,z.loc,()=>z.var);Object.assign(z,replacement);}
+    else if(level.i>=2 && n%4===0){z.type='shield';z.hp=3;z.maxHp=3;}
     else if(level.i>=4 && n%4===1){z.type='thief';z.speed=1.8;}
     else if(level.i>=6 && n%4===2){
       const tx=Math.floor(z.x/T);
@@ -705,6 +708,9 @@ function makeZombie(x, type, loc, rng){
   if (type==='walker'){ z.w=26; z.h=46; z.hp=2; z.speed=.5 + r*.25; z.pts=100; }
   if (type==='runner'){ z.w=26; z.h=46; z.hp=1; z.speed=1.5 + r*.4; z.pts=200; }
   if (type==='brute'){ z.w=38; z.h=64; z.hp=7; z.speed=.42; z.pts=500; }
+  if(type==='leaper'){z.w=26;z.h=40;z.hp=3;z.speed=.8;z.pts=300;z.attack=100;}
+  if(type==='plated'){z.w=32;z.h=52;z.hp=6;z.speed=.5;z.pts=400;}
+  if(type==='medic'){z.w=26;z.h=46;z.hp=4;z.speed=.45;z.pts=350;z.attack=180;}
   z.maxHp = z.hp;
   z.y = GROUND - z.h;
   return z;
@@ -829,7 +835,7 @@ function spawnWave(){
   const r=activeRun;r.breakTicks=0;r.wave++;L.zs=[];spits=[];bullets=[];
   const count=Math.min(18,3+r.wave*2),rng=mkRng(r.wave*991);
   for(let n=0;n<count;n++){
-    const type=r.wave>=4 && n%5===0?'brute':r.wave>=2 && n%3===0?'runner':'walker';
+    const type=r.wave>=8 && n%7===0?'medic':r.wave>=6 && n%5===1?'plated':r.wave>=3 && n%4===2?'leaper':r.wave>=4 && n%5===0?'brute':r.wave>=2 && n%3===0?'runner':'walker';
     const x=player.x<12*T?21*T+(n%2)*T:2*T+(n%2)*T;
     const z=makeZombie(x,type,'nola',rng);z.active=true;z.speed*=1+Math.min(.8,r.wave*.035);L.zs.push(z);
   }
@@ -869,6 +875,10 @@ function renderFieldGuide(){
     ['Brute','Heavy target with seven health; stomps deal three damage. Railgun and Plasma are effective.'],
     ['Shield zombie','Blue shield blocks one frontal hit, then opens for 45 ticks. Follow up, flank or stomp.'],
     ['Cargo thief','Gold-marked, fast enemy. Contact knocks cargo onto visible open street for recovery.'],
+    ...WEAPONS.slice(6).map(w=>[w.name,w.desc+' Select with '+(WEAPONS.indexOf(w)+1)+', Q/E or the free store loadout.']),
+    ['Leaper','Orange-legged hopper. Stops with a warning marker for half a second before leaping. Freeze pauses its windup.'],
+    ['Plated zombie','Grey body armor halves ordinary bullet damage. Piercing weapons ignore armor; stomps bypass it.'],
+    ['Medic zombie','White cross backpack. Every three seconds heals nearby other zombies by one, never itself or through walls. Prioritize it.'],
     ['Rooftop thrower','Stationary perch attacker. Watch the lob arc; Cryo slows movement but Freeze Wave stops attacks.'],
     ...LOCS.map(loc=>[loc.boss.name,SIGNATURES[loc.id]+'. One-second warning; signatures intensify below 40% health.']),
     ['Daily Dispatch','UTC date selects a non-boss stage and fixed weapon. No shop, free caches, paid powers, coin earnings or boss upgrades. Deliver cargo in one life; retries are unlimited. Local records follow your device clock and are not cheat-proof.'],
@@ -909,7 +919,7 @@ document.getElementById('campaign').addEventListener('keydown',e=>{
 });
 resetUpgrades();
 
-// Eight additional shop powers; existing boss rewards are unchanged.
+// Timed shop powers supplement the existing boss rewards.
 const SHOP_POWERS = [
   {id:'shield', name:'Shield', cost:20, desc:'Ignore enemy damage for 30 seconds.'},
   {id:'magnet', name:'Coin Magnet', cost:15, desc:'Collect king cakes within 5 tiles for 30 seconds.'},
@@ -924,7 +934,11 @@ const SHOP_POWERS = [
   {id:'frost', name:'Cryo Ammo', cost:20, desc:'Shots slow enemies for 30 seconds.'},
   {id:'regen', name:'Regeneration', cost:25, desc:'Recover a heart every 5 seconds for 30 seconds.'},
   {id:'coolant', name:'Infinite Coolant', cost:20, desc:'No weapon heat for 30 seconds.'},
-  {id:'rescue', name:'Rescue Drone', cost:30, desc:'One rescue from a fall within 30 seconds.'}
+  {id:'rescue', name:'Rescue Drone', cost:30, desc:'One rescue from a fall within 30 seconds.'},
+  {id:'airhop', name:'Air Step', cost:20, desc:'One midair jump per landing for 30 seconds. Does not stack with boss double jump.'},
+  {id:'barrier', name:'Lasting Ward', cost:12, desc:'Absorb one damaging hit within 30 seconds. Falls and timeout still kill.'},
+  {id:'focus', name:'Gunslinger Focus', cost:20, desc:'Half weapon heat and tighter pellet spread for 30 seconds.'},
+  {id:'pulse', name:'Frost Pulse', cost:25, desc:'Every 2 seconds, slow nearby visible zombies and bosses for 30 seconds.'}
 
 ];
 const WEAPONS = [
@@ -933,7 +947,10 @@ const WEAPONS = [
   {name:'Railgun', pellets:1, delay:38, speed:22, damage:5, heat:18, life:50, pierce:5, color:'#69edff'},
   {name:'Plasma', pellets:1, delay:12, speed:9, damage:2, heat:8, life:80, color:'#b795ff'},
   {name:'Flamer', pellets:3, delay:5, speed:7, damage:.5, heat:4, life:16, color:'#ff633b'},
-  {name:'Cryo Blaster', pellets:1, delay:17, speed:11, damage:1.5, heat:7, life:60, slow:true, color:'#b1faff'}
+  {name:'Cryo Blaster', pellets:1, delay:17, speed:11, damage:1.5, heat:7, life:60, slow:true, color:'#b1faff'},
+  {name:'Nail Repeater', pellets:1, delay:4, speed:18, damage:.55, heat:3, life:40, color:'#ecf2ff', desc:'Rapid, low-damage precision nails.'},
+  {name:'Bayou Crossbow', pellets:3, delay:32, speed:16, damage:1.8, heat:9, life:48, pierce:2, color:'#78d6a0', desc:'Three piercing bolts in a narrow fan.'},
+  {name:'Grenade Launcher', pellets:1, delay:45, speed:8, damage:4, heat:20, life:65, gravity:.18, blast:78, color:'#ff9b54', desc:'Arcing shell explodes on impact or fuse; blast is blocked by walls.'}
 ];
 let weaponIndex=0, vampireKills=0;
 function selectWeapon(index){
@@ -971,7 +988,7 @@ function releaseControls(){
 function renderShop(){
   refreshWallet();
   const loadout=document.getElementById('weapons');loadout.replaceChildren();
-  WEAPONS.forEach((weapon,i)=>{const button=document.createElement('button');button.textContent=(i+1)+'. '+weapon.name;button.setAttribute('aria-pressed',String(i===weaponIndex));button.addEventListener('click',()=>selectWeapon(i));loadout.append(button);});
+  WEAPONS.forEach((weapon,i)=>{const button=document.createElement('button');button.textContent=(i+1)+'. '+weapon.name;button.title=weapon.desc||weapon.name+' · Damage '+weapon.damage+' · Heat '+weapon.heat;button.setAttribute('aria-label',button.textContent+'. '+button.title);button.setAttribute('aria-pressed',String(i===weaponIndex));button.addEventListener('click',()=>selectWeapon(i));loadout.append(button);});
   const container = document.getElementById('shopItems'); container.replaceChildren();
   for(const item of SHOP_POWERS){
     const card = document.createElement('div'); card.className='shopItem';
@@ -1111,6 +1128,7 @@ function killZombie(z, dirSign){
 function hurtPlayer(srcX){
   const p = player;
   if (p.inv > 0 || effects.shield>0 || state!=='play') return;
+  if(effects.barrier>0){effects.barrier=0;p.inv=45;snd('bump');popups.push({x:p.x,y:p.y-12,t:50,txt:'WARD BLOCK'});return;}
   p.health--; p.inv = 100; p.hurtFlash=12; shake = 8;
   if (L.boss && !L.boss.dead && Math.random() < .35) bossSay(1 + Math.floor(Math.random()*2));
   p.vx = (p.x + p.w/2 < srcX ? -5 : 5); p.vy = -6;
@@ -1128,18 +1146,38 @@ function fire(){
   const n=weapon.pellets+(weapon.pellets===1 && up.spread>0 ? (up.spread>=2?4:2) : 0);
   const mx=p.x+p.w/2+p.face*38, my=p.y+29;
   for(let k=0;k<n;k++){
-    const spread=n===1?0:(k-(n-1)/2)*(weapon.name==='Flamer'?.65:1.1);
-    bullets.push({x:mx,y:my,originX:p.x+p.w/2+p.face*(p.w/2+1),originY:my,vx:p.face*weapon.speed,vy:spread,life:weapon.life,
+    const spread=n===1?0:(k-(n-1)/2)*(weapon.name==='Flamer'?.65:weapon.name==='Bayou Crossbow'?.55:1.1)*(effects.focus>0?.5:1);
+    bullets.push({x:mx,y:my,originX:p.x+p.w/2+p.face*(p.w/2+1),originY:my,vx:p.face*weapon.speed,vy:(weapon.gravity?-3:0)+spread,life:weapon.life,
       dmg:bulletDmg()*weapon.damage*(effects.damage>0?2:1),pierce:(weapon.pierce||0)+(up.ap>0?2:0),
-      slow:weapon.slow||effects.frost>0,color:weapon.color,hit:new Set()});
+      slow:weapon.slow||effects.frost>0,color:weapon.color,gravity:weapon.gravity||0,blast:weapon.blast||0,hit:new Set()});
   }
   parts.push({kind:'shell', x:p.x+p.w/2 + p.face*8, y:my-4, vx:-p.face*(1.5+Math.random()), vy:-3-Math.random()*2, t:40});
   p.flash = 3; p.recoil = 2; p.fireCd = Math.max(3,weapon.delay/(1+up.rapid*.2));
-  p.heat += effects.coolant>0 ? 0 : weapon.heat/(1+up.cool*.6);
+  p.heat += effects.coolant>0 ? 0 : weapon.heat*(effects.focus>0?.5:1)/(1+up.cool*.6);
   if (p.heat >= 100){ p.heat = 100; p.overheat = true; snd('heat'); popups.push({x:p.x+p.w/2, y:p.y-10, t:50, txt:'OVERHEAT'}); }
   snd('shot');
 }
 
+function clearShot(x,y,tx,ty){
+  const steps=Math.max(1,Math.ceil(Math.max(Math.abs(tx-x),Math.abs(ty-y))/8));
+  for(let i=1;i<=steps;i++)if(solidAt(Math.floor((x+(tx-x)*i/steps)/T),Math.floor((y+(ty-y)*i/steps)/T)))return false;
+  return true;
+}
+function detonate(b){
+  if(!b.blast || b.exploded)return;
+  b.exploded=true;b.life=0;snd('break');shake=Math.max(shake,4);
+  parts.push({kind:'blast',x:b.x,y:b.y,r:b.blast,t:16});
+  for(const z of L.zs){
+    if(!z.alive||z.dead||!z.active)continue;
+    const x=z.x+z.w/2,y=z.y+z.h/2;
+    if(Math.hypot(x-b.x,y-b.y)<b.blast && clearShot(b.x,b.y,x,y)){
+      z.hp-=b.dmg;z.flash=6;registerHit(x,y);if(b.slow)z.slow=180;
+      if(z.hp<=0)killZombie(z,Math.sign(x-b.x)||1);
+    }
+  }
+  const B=L.boss;
+  if(B && !B.dead && Math.hypot(B.x+B.w/2-b.x,B.y+B.h/2-b.y)<b.blast+B.w/2 && clearShot(b.x,b.y,B.x+B.w/2,B.y+B.h/2))damageBoss(b.dmg);
+}
 // ---------- Boss ----------
 const SIGNATURES={nola:'VOODOO CALL · clear the reinforcements',la:'SUNSET DASH · jump over the charge',hou:'BAYOU QUAKE · jump the ground waves',lej:'GUNNY BARRAGE · move from the landing zone',pi:'DRILL STRIKES · leave the marked street'};
 function updateSignature(B){
@@ -1278,6 +1316,11 @@ function update(){
 
   if(effects.regen>0 && effects.regen%300===0)p.health=Math.min(maxHealth(),p.health+1);
   if(effects.coolant>0){p.heat=0;p.overheat=false;}
+  if(effects.pulse>0 && effects.pulse%120===0){
+    const x=p.x+p.w/2,y=p.y+p.h/2;
+    parts.push({kind:'frostpulse',x,y,r:145,t:20});
+    for(const z of [...L.zs,...(L.boss?[L.boss]:[])])if(z.alive!==false && !z.dead && Math.hypot(z.x+z.w/2-x,z.y+z.h/2-y)<145 && clearShot(x,y,z.x+z.w/2,z.y+z.h/2))z.slow=180;
+  }
   const course=L.info.course || COURSES[0];
   const region=(L.elements||[]).find(e=>p.x+p.w>e.x && p.x<e.x+e.w);
   const onStreet=p.onGround && Math.abs(p.y+p.h-GROUND)<2;
@@ -1286,7 +1329,7 @@ function update(){
   // movement
   const maxV = (run() ? 5.2 : 3.6)*(effects.haste>0?1.35:1)*(wading?.65:1);
   const reversing=(left() && p.vx>0)||(right() && p.vx<0);
-  const acc=p.onGround?(slippery?.24:reversing?.72:.50):.22;
+  const acc=p.onGround?(slippery?.24:reversing?.72:.50):(reversing?.38:.30);
   const fr=slippery?.025:p.onGround?.50:.08;
   if (left() && !right()){ p.vx = Math.max(p.vx - acc, -maxV); p.face = -1; }
   else if (right() && !left()){ p.vx = Math.min(p.vx + acc, maxV); p.face = 1; }
@@ -1297,7 +1340,7 @@ function update(){
   if (p.onGround) p.dblUsed = false;
   if (jumpPressed) p.buf = 9; else p.buf--;
   if (p.buf>0 && p.coyote>0){ p.vy = -11.6 - Math.abs(p.vx)*.25 - (effects.boots>0 ? 2 : 0); p.buf=0; p.coyote=0; snd('jump'); }
-  else if (jumpPressed && up.double && !p.dblUsed && p.coyote<=0){ p.vy = -10.5; p.dblUsed = true; p.buf = 0; snd('jump'); for (let k=0;k<6;k++) parts.push({kind:'puff', x:p.x+p.w/2, y:p.y+p.h, vx:(Math.random()-.5)*3, vy:Math.random()*1.5, t:20}); }
+  else if (jumpPressed && (up.double || effects.airhop>0) && !p.dblUsed && p.coyote<=0){ p.vy = -10.5; p.dblUsed = true; p.buf = 0; snd('jump'); for (let k=0;k<6;k++) parts.push({kind:'puff', x:p.x+p.w/2, y:p.y+p.h, vx:(Math.random()-.5)*3, vy:Math.random()*1.5, t:20}); }
   jumpPressed = false;
   if (!jumpHeld() && p.vy < -4) p.vy = -4;
   p.vy = Math.min(p.vy + (jumpHeld() && p.vy<0 ? .48 : .8)*(course.element==='gravity'?.78:course.element==='wind' && jumpHeld() && p.vy<0?.9:1), 13);
@@ -1373,7 +1416,16 @@ function update(){
     if(z.type==='thrower' && --z.attack<=0){
       spits.push({x:z.x+z.w/2,y:z.y+10,vx:Math.max(-7,Math.min(7,dx/45)),vy:-7,t:160});z.attack=150;snd('spit');
     }
-    const sp = (z.slow>0?.35:1)*(z.type==='runner' && Math.abs(dx) > 260 ? z.speed*.5 : z.speed);
+    if(z.type==='leaper' && z.onGround && Math.abs(dx)<330){
+      if(--z.attack<=0){z.vy=-10;z.attack=130;}
+    }
+    if(z.type==='medic' && --z.attack<=0){
+      for(const ally of L.zs)if(ally!==z && ally.alive && !ally.dead && ally.active && Math.hypot(ally.x-z.x,ally.y-z.y)<160 && clearShot(z.x+z.w/2,z.y+20,ally.x+ally.w/2,ally.y+20)){
+        ally.hp=Math.min(ally.maxHp,ally.hp+1);
+      }
+      parts.push({kind:'frostpulse',x:z.x+z.w/2,y:z.y+20,r:160,t:20});z.attack=180;
+    }
+    const sp = (z.type==='leaper' && z.onGround && z.attack<30?0:1)*(z.slow>0?.35:1)*(z.type==='runner' && Math.abs(dx) > 260 ? z.speed*.5 : z.speed);
     z.vx = z.dir * sp;
     z.vy = Math.min(z.vy + .6, 10);
     moveBody(z);
@@ -1395,6 +1447,7 @@ function update(){
   // Substep fast projectiles and visit frontmost targets first, not spawn-array order.
   for (const b of bullets){
     const targets=[...L.zs].sort((a,c)=>b.vx>=0?a.x-c.x:(c.x+c.w)-(a.x+a.w));
+    b.vy+=b.gravity||0;
     const endX=b.x+b.vx,endY=b.y+b.vy;
     if(b.originX!==undefined){b.x=b.originX;b.y=b.originY;delete b.originX;delete b.originY;}
     const dx=endX-b.x,dy=endY-b.y;
@@ -1404,6 +1457,7 @@ function update(){
       const tx = Math.floor(b.x / T), ty = Math.floor(b.y / T);
       if (solidAt(tx, ty)){
         if (tileAt(tx,ty)==='B'){ breakBrick(tx, ty); addScore(50); }
+        if(b.blast){b.x-=dx/steps;b.y-=dy/steps;detonate(b);}
         b.life = 0; parts.push({kind:'spark', x:b.x, y:b.y, t:8});
         continue;
       }
@@ -1411,12 +1465,13 @@ function update(){
       for (const z of targets){
         if (!z.alive || z.dead || !z.active || b.hit.has(z)) continue;
         if (b.x > z.x && b.x < z.x + z.w && b.y > z.y && b.y < z.y + z.h){
+          if(b.blast){detonate(b);break;}
           if(z.type==='shield' && !z.guardBreak && Math.sign(b.vx)===-z.dir){
             z.guardBreak=45;b.life=0;parts.push({kind:'spark',x:b.x,y:b.y,t:8});snd('bump');break;
           }
           registerHit(b.x,b.y);
           if(b.slow)z.slow=180;
-          z.hp -= b.dmg; z.flash = 4; b.hit.add(z); z.x += Math.sign(b.vx) * (z.type==='brute' ? .8 : 2.5);
+          z.hp -= b.dmg*(z.type==='plated' && b.pierce<=0?.5:1); z.flash = 4; b.hit.add(z); z.x += Math.sign(b.vx) * (z.type==='brute' ? .8 : 2.5);
           gore(b.x, b.y, 2);
           if (z.hp <= 0) killZombie(z, Math.sign(b.vx)); else snd('zhit');
           if (b.pierce-- <= 0){ b.life = 0; break; }
@@ -1424,11 +1479,12 @@ function update(){
       }
       const B = L.boss;
       if (b.life > 0 && B && !B.dead && b.x > B.x && b.x < B.x + B.w && b.y > B.y && b.y < B.y + B.h){
+        if(b.blast){detonate(b);continue;}
         if(b.slow)B.slow=180;
         damageBoss(b.dmg); b.life = 0; gore(b.x, b.y, 2); if (frame % 3 === 0) snd('bosshit');
       }
     }
-    if(b.life>0)b.life--;
+    if(b.life>0 && --b.life===0)detonate(b);
   }
   bullets = bullets.filter(b => b.life > 0);
 
@@ -1901,6 +1957,10 @@ function drawLevel(){
     else if (q.kind==='shell'){ cx.fillStyle = '#d4a017'; cx.fillRect(q.x, q.y, 4, 2); }
     else if (q.kind==='spark'){ cx.fillStyle = '#fff6a0'; cx.beginPath(); cx.arc(q.x, q.y, 9 - q.t, 0, 7); cx.fill(); }
     else if (q.kind==='puff'){ cx.fillStyle = 'rgba(255,255,255,.6)'; cx.beginPath(); cx.arc(q.x, q.y, 5, 0, 7); cx.fill(); }
+    else if(q.kind==='blast' || q.kind==='frostpulse'){
+      cx.strokeStyle=q.kind==='blast'?'#ffb35d':'#a0fff2';cx.lineWidth=q.kind==='blast'?3:2;
+      cx.beginPath();cx.arc(q.x,q.y,q.r*(1-q.t/(q.kind==='blast'?16:20)),0,Math.PI*2);cx.stroke();
+    }
     else if (q.kind==='medpop') drawMedkit(q.x, q.y);
     else drawKingCake(q.x, q.y);
   }
@@ -2011,10 +2071,13 @@ function drawZombie(z){
   if(!z.dead){
     if(z.type==='shield'){cx.fillStyle=z.guardBreak>0?'#666':'#6ec4e8';cx.fillRect(z.x+z.w/2+z.dir*16-4,z.y+14,8,30);}
     if(z.type==='thrower')sh('LOB',z.x+z.w/2,z.y-12,'#ffab65',7,'center');
+    if(z.type==='plated'){cx.fillStyle='#bac5d1';cx.fillRect(z.x+4,z.y+15,z.w-8,20);sh('ARMOR',z.x+z.w/2,z.y-20,'#d9e4ef',6,'center');}
+    if(z.type==='medic'){cx.fillStyle='#fff';cx.fillRect(z.x+4,z.y+15,18,18);cx.fillStyle='#ff675f';cx.fillRect(z.x+11,z.y+17,4,14);cx.fillRect(z.x+6,z.y+22,14,4);sh(z.attack<30?'HEAL!':'MEDIC',z.x+z.w/2,z.y-20,'#9fffba',6,'center');}
+    if(z.type==='leaper'){cx.fillStyle='#ffab65';cx.fillRect(z.x+2,z.y+z.h-14,z.w-4,9);sh(z.attack<30?'JUMP!':'LEAPER',z.x+z.w/2,z.y-20,'#ffab65',6,'center');}
     if(z.type==='thief')sh('THIEF',z.x+z.w/2,z.y-12,'#ffe08a',7,'center');
   }
-  // brute health bar
-  if (z.type==='brute' && !z.dead && z.hp < z.maxHp){
+  // Damaged targets expose remaining health in either render mode.
+  if (!z.dead && z.hp < z.maxHp){
     cx.fillStyle = '#000'; cx.fillRect(z.x, z.y - 10, z.w, 5); cx.fillStyle = '#e83a3a'; cx.fillRect(z.x+1, z.y-9, (z.w-2)*z.hp/z.maxHp, 3);
   }
 }
@@ -2098,9 +2161,14 @@ function drawPlayer(p){
   cx.fillStyle = '#f5b800'; cx.font = '5px "Press Start 2P", monospace'; cx.textAlign='center'; cx.fillText('29', -1, 18);
   // back arm to pistol grip
   cx.fillStyle = '#000'; cx.fillRect(-4, 10, 5, 9); cx.fillStyle = '#e8b98a'; cx.fillRect(-1, 17, 5, 4);
-  // M240 machine gun
+  // Shared gun body with distinct new weapon attachments.
   const r = -p.recoil;
   cx.save(); cx.translate(r, 0);
+  const equipped=WEAPONS[weaponIndex];
+  if(equipped.name==='Bayou Crossbow'){cx.strokeStyle=equipped.color;cx.lineWidth=3;cx.beginPath();cx.moveTo(29,1);cx.lineTo(37,15);cx.lineTo(29,29);cx.stroke();}
+  if(equipped.name==='Grenade Launcher'){cx.fillStyle=equipped.color;cx.fillRect(8,13,25,12);}
+  if(equipped.name==='Nail Repeater'){cx.fillStyle=equipped.color;cx.fillRect(16,8,22,3);}
+
   cx.fillStyle = '#1b1b1b'; cx.fillRect(-14, 12, 12, 6); cx.fillRect(-15, 11, 3, 8);           // stock
   cx.fillStyle = '#2b2b2b'; cx.fillRect(-3, 11, 22, 8);                                         // receiver
   cx.fillStyle = '#111';    cx.fillRect(-3, 10, 22, 2);                                         // feed cover
@@ -2157,7 +2225,9 @@ function drawHUD(){
     sh(L.info.street + ' · ' + L.info.loc.city, 400, 70, '#f5d77a', 8, 'center');
   }
   const active=SHOP_POWERS.filter(item=>effects[item.id]>0);
-  active.forEach((item,i)=>sh(item.name.toUpperCase()+' '+Math.ceil(effects[item.id]/60)+'s',18,88+i*13,'#9fffba',8));
+  active.forEach((item,i)=>sh(item.name.toUpperCase()+' '+Math.ceil(effects[item.id]/60)+'s',18+Math.floor(i/6)*250,88+(i%6)*13,'#9fffba',8));
+  if(effects.barrier>0){sh('WARD READY',650,88,'#a0fff2',8);}
+  if(player.overheat)sh('COOLING '+Math.ceil(Math.max(0,player.heat-35)/1.1/60)+'s',650,100,'#ffab65',8);
   if(player.hitMark>0){
     const x=player.hitX-cam,y=player.hitY;
     cx.strokeStyle='#fff3b0';cx.lineWidth=2;cx.beginPath();
@@ -2203,12 +2273,12 @@ function drawScreens(){
     if (head.complete) cx.drawImage(head, VW/2-46, 52, 92, 100);
     const si = levelInfo(startPick);
     centerText([['CARGO QUEST', 182, 32, '#f5b800'], ['ZOMBIE STREETS', 218, 14, '#7fd13b'],
-      ['3D SIDE-SCROLLER · SIX WEAPONS', 244, 9, '#c58bff'],
+      ['3D SIDE-SCROLLER · NINE WEAPONS', 244, 9, '#c58bff'],
       ['START AT LEVEL  < ' + pad(startPick+1, 3) + ' >', 280, 11, '#fff'],
       [si.street + ' · ' + si.loc.city, 300, 8, '#f5d77a'],
       [frame%60<40 ? 'PRESS ENTER OR TAP TO START' : '', 332, 12],
       ['MOVE ARROWS/A D  JUMP SPACE/W  SHOOT F/J/CLICK', 368, 8, '#ddd'],
-      ['C DISPATCH / MODES  Q WEAPON  P PAUSE', 386, 8, '#ddd'],
+      ['C DISPATCH  Q/E WEAPON  P PAUSE', 386, 8, '#ddd'],
       ['BOSS EVERY 5 LEVELS · BEAT IT FOR A POWER-UP', 408, 8, '#ff8a8a'],
       ['TOP SCORE ' + pad(best, 7), 430, 9, '#9cf09c']]);
   } else if (state==='intro'){

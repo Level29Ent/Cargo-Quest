@@ -22,18 +22,20 @@ Background buildings, cars, trees and lamps use a muted blue-grey material pass;
 
 - Move: A/D or arrows. Jump: Space/W/Up (hold for height; tap for a short platform hop).
 - Fire: F/J/Z/K or mouse. Sprint: Shift/X. Mobile: onscreen movement, FIRE, JUMP.
-- Weapon: Q, keys 1–6, the top-left weapon button, or the free loadout in the store.
+- Weapon: Q (next), E (previous), keys 1–9, the top-left weapon button, or the free loadout in the store.
 - Start/resume: Enter or tap. Pause: P. Restart stage: R. Title arrows select any starting stage.
 - Campaign: CAMPAIGN button or C. Escape closes it.
 - Store: STORE button or B. Escape closes it. Shopping pauses gameplay and effect timers.
 
 ## Responsive game feel
 
-Ground contact remains stable under subpixel gravity. Normal ground acceleration reaches the unchanged walking top speed in eight simulation ticks; firmer braking and faster reversals help avoid accidental pit drift. Ice retains its slippery handling, and air steering/jump height remain unchanged. Coyote grace is eight ticks (~133 ms) and the jump buffer is nine ticks (~150 ms) at 60 Hz; hold for height, release for short hops.
+Ground contact remains stable under subpixel gravity. Normal ground acceleration reaches the unchanged walking top speed in eight simulation ticks; firmer braking and faster reversals help avoid accidental pit drift. Ice retains its slippery handling. Air acceleration is now 0.30 (0.38 when reversing), up from 0.22, for quicker midair correction without raising top speed or changing jump height. Coyote grace is eight ticks (~133 ms) and the jump buffer is nine ticks (~150 ms) at 60 Hz; hold for height, release for short hops.
 
 Touch buttons use captured Pointer Events with per-button pointer ownership, so releasing FIRE cannot cancel movement or another finger. The onscreen pause/resume button works alongside P. Losing window focus or hiding the page clears held controls and pauses active gameplay; resume explicitly. Pause and shopping freeze simulation/hazard timers. New stages clear stale held inputs.
 
-Successful shots display a short hit-confirmation marker in both render modes, damage shows a brief border flash, and solid landings emit dust. 3D weapons now use the existing recoil value. No hit-stop, forced camera shake, new currency charges, or weapon damage changes are introduced. Existing saved coins and course layouts are preserved.
+Damaged zombies show remaining-health bars in both render modes; new enemy silhouettes and warning markers show their roles. Q/E cycle weapons forward/back and 1–9 select directly. Switching preserves cooldown and heat, so it cannot be used to bypass weapon recovery. Overheat shows an approximate cooling countdown. Active powers wrap into columns instead of extending down the entire playfield.
+
+Successful shots display a short hit-confirmation marker in both render modes, damage shows a brief border flash, and solid landings emit dust. 3D weapons now use the existing recoil value. Existing weapon damage is unchanged; the new grenade blast adds a small impact shake. Existing saved coins and course layouts are preserved.
 
 ## Cargo contracts, campaign and medals
 
@@ -51,6 +53,9 @@ Variants progressively join the existing generated enemy roster without modifyin
 
 - **Shield zombies** (stage 3 onward): blue frontal shield blocks one hit, then staggers for 45 ticks. Follow up, attack from behind, or stomp.
 - **Cargo thieves** (stage 5 onward): faster gold-marked enemies knock carried cargo loose on contact, then flee briefly.
+- **Leapers** (stage 9 onward): orange leg markings and a half-second jump warning before takeoff.
+- **Plated zombies** (stage 13 onward): silver body armor halves ordinary bullet damage. Piercing rounds and stomps bypass plating.
+- **Medic zombies** (stage 17 onward): white cross packs; every three seconds, heal nearby other zombies by one up to their normal maximum, never through terrain or themselves. They do not heal bosses.
 - **Rooftop throwers** (stage 7 onward): occupy existing raised block perches and periodically lob ballistic projectiles. Freezing pauses their attacks.
 
 Every regional boss retains its original attacks and gains a signature after a full one-second warning: New Orleans summons a bounded reinforcement group; Los Angeles locks a dash direction; Houston releases ground waves; Camp Lejeune lobs a projectile fan; Parris Island strikes three marked street positions. Jumping avoids ground strikes. Below 40% health, signature cadence increases from six to four seconds and attack counts/durations intensify. Boss warning timers freeze with pause, shopping, dispatch and Freeze Wave. Both renderers show warning markers and tactical enemy cues.
@@ -69,23 +74,23 @@ Outfits and weapon colors appear in both render modes. Companions are animated H
 
 ## Daily Dispatch, Survival Arena and field guide
 
-Open **CAMPAIGN [C]** → **Extra Modes**. The expandable **Field Guide** explains all six enemy types, five boss signatures and both mode rule sets, without unlock gates. It is readable while gameplay is frozen by Dispatch.
+Open **CAMPAIGN [C]** → **Extra Modes**. The expandable **Field Guide** explains all nine enemy types, five boss signatures and both mode rule sets, without unlock gates. It is readable while gameplay is frozen by Dispatch.
 
 ### Daily Dispatch
 
-The device's current UTC date selects one existing non-boss route and one of the six weapons. The date is captured at the start of an attempt; midnight does not relabel it, and Retry repeats that original day's contract. You start with three hearts and one life, no boss upgrades, no store, no free power caches and a locked weapon. Deliver the stage's cargo. You can clear without it, but that is not a successful delivery record. There are unlimited retries, and the result screen reports delivery/failure and active play time. R restarts the contract; Enter or tap retries the result. Dispatch always offers today's new contract.
+The device's current UTC date selects one existing non-boss route and one of the nine weapons. The date is captured at the start of an attempt; midnight does not relabel it, and Retry repeats that original day's contract. You start with three hearts and one life, no boss upgrades, no store, no free power caches and a locked weapon. Deliver the stage's cargo. You can clear without it, but that is not a successful delivery record. There are unlimited retries, and the result screen reports delivery/failure and active play time. R restarts the contract; Enter or tap retries the result. Dispatch always offers today's new contract.
 
 Successful delivery times retain the fastest result for each day. Cargo success and highest cleared-run score are also retained; a slower or missed-cargo clear never erases a better delivery. Only the newest 30 daily record dates are stored. This rotates existing routes rather than generating a new campaign or providing a server-controlled competition. The client clock and browser saves are not cheat-proof; there are no online rankings or currency rewards.
 
 ### Survival Arena
 
-A separate closed, pit-free arena allows movement in both directions, with no scrolling, exit, stage timer, cargo or coin pickups. All six weapons are free to switch. You get three hearts, one life, no boss upgrades and no store. A two-second opening warning precedes the first wave. Waves start with five enemies, increasing by two per wave to a maximum of 18. Runners join at wave 2 and brutes at wave 4; their movement multiplier rises by 3.5% per wave to a maximum of 1.8×. Enemies spawn on the side away from you.
+A separate closed, pit-free arena allows movement in both directions, with no scrolling, exit, stage timer, cargo or coin pickups. All nine weapons are free to switch. You get three hearts, one life, no boss upgrades and no store. A two-second opening warning precedes the first wave. Waves start with five enemies, increasing by two per wave to a maximum of 18. Runners join at wave 2 and brutes at wave 4; their movement multiplier rises by 3.5% per wave to a maximum of 1.8×. Enemies spawn on the side away from you.
 
 Clearing a wave heals one heart and begins a two-second break. Hostile projectiles are removed and brief invulnerability protects the break. Every third completed wave grants ten seconds of Infinite Coolant. Cleared-wave and score records save locally at each wave clear and on defeat; this is not a resumable arena run. R restarts from wave 1. Results can be retried with Enter or tap. Pause, store restrictions and Dispatch freeze simulation as appropriate.
 
 Both modes are isolated from campaign checkpoints, campaign high scores, medals and the coin economy. No kill, king cake or completion in either mode changes the coin balance or grants extra lives. Returning to any campaign stage restores normal store and weapon behavior. Extra-mode records use the separate `cargoQuest2.modes.v1` key with validated loading and session-only fallback if storage is unavailable.
 
-## Six free weapons
+## Nine free weapons
 
 All weapons are immediately available; there is no paid weapon gate or ammunition grind. Heat and cooldowns provide different trade-offs. Existing boss-reward weapon upgrades apply to the equipped weapon.
 
@@ -97,6 +102,9 @@ All weapons are immediately available; there is no paid weapon gate or ammunitio
 | Plasma | Slower, hard-hitting projectiles |
 | Flamer | Rapid three-projectile, close-range cone |
 | Cryo Blaster | Slows hit enemies and bosses |
+| Nail Repeater | Rapid precision nails, low damage per hit |
+| Bayou Crossbow | Narrow three-bolt fan; pierces enemies and ignores plating |
+| Grenade Launcher | Arcing explosive shell; impact or fuse detonation, 78px blast blocked by terrain |
 
 ## 100 distinct stages, ten course families
 
@@ -117,7 +125,7 @@ Each stage has a deterministic layout, course-specific scenery/palette, element 
 
 Element strips are placed only on intact open street, never across a pit. Timed damage has a warning period. The original repaired pit-platform height/spacing remains: no store purchase, sprint, or double jump is required for those crossings.
 
-## Coins and fourteen power-ups
+## Coins and eighteen power-ups
 
 King cakes award 1 coin and defeated zombies award 3, separate from score and the 50-cake extra-life counter. Free stage caches cycle through the power-up catalog. Existing boss upgrades are unchanged.
 
@@ -137,14 +145,18 @@ King cakes award 1 coin and defeated zombies award 3, separate from score and th
 | Regeneration | 25 | Heal one heart every 5s for 30s |
 | Infinite Coolant | 20 | No weapon heat for 30s |
 | Rescue Drone | 30 | One return to the last safe street position after a fall within 30s |
+| Air Step | 20 | One midair jump per landing for 30s; does not stack with boss double jump |
+| Lasting Ward | 12 | Absorb one damaging hit within 30s; falls/timeout still kill |
+| Gunslinger Focus | 20 | Half shot heat and tighter pellet spread for 30s |
+| Frost Pulse | 25 | Every 2s, slow visible enemies within 145px for 30s |
 
-Timed purchases extend duration. Powers carry between stages/deaths and reset on a new run. The six new powers add to the previous eight, rather than replacing them.
+Timed purchases extend duration. Powers carry between stages/deaths and reset on a new run. All eighteen powers remain available; the new powers supplement rather than replace the earlier catalog. Lasting Ward purchases extend its time window, not the number of hits it blocks.
 
 The existing `cargoQuest2.coins` browser-storage key is preserved. Coins remain saved across new runs/reloads on the same origin/device. They do not sync between devices, accounts, or preview URLs; clearing site data removes them. With storage blocked, coins are session-only. No real-money purchases or server-authoritative economy are provided.
 
 ## Verification
 
-`npm test` checks renderer instance transforms across all 100 stages (with a stubbed GPU), all four geometry types, procedural material/sky creation, batch counts, the rendering toggle, and WebGL failure/context-loss fallback. It also executes the real game logic with stubbed browser/audio interfaces. It checks six firing patterns; fourteen purchases, effects, costs, expiry and persistence; all ten course mechanics; 100 distinct stage configurations; hazard placement; and the earlier 528 generated pit-platform crossings. `npm run build` bundles the renderer and static assets. Browser checks are separate: a passing simulation does not prove real iPhone/Safari multitouch, GPU performance, or a full playthrough of every course.
+`npm test` checks renderer instance transforms across all 100 stages (with a stubbed GPU), all four geometry types, procedural material/sky creation, batch counts, the rendering toggle, and WebGL failure/context-loss fallback. It also executes the real game logic with stubbed browser/audio interfaces. It checks nine firing patterns; eighteen purchases, effects, costs, expiry and persistence; all ten course mechanics; 100 distinct stage configurations; hazard placement; and the earlier 528 generated pit-platform crossings. `npm run build` bundles the renderer and static assets. Browser checks are separate: a passing simulation does not prove real iPhone/Safari multitouch, GPU performance, or a full playthrough of every course.
 
 Campaign regression tests additionally cover independent medals and best results, reward idempotency, save validation/reload/storage failure, cargo pickup/theft/recovery, all cosmetic thresholds, dispatch pause, tactical enemy behavior, and all five boss signatures with warning and enrage behavior. Full device playthroughs and real GPU performance remain separate manual checks.
 
@@ -157,3 +169,5 @@ Fatal hazards, enemies and projectiles now stop the active update before healing
 Player bullets check the path from the player to the muzzle on their first tick, substep travel to prevent tunneling, and test frontmost enemies before farther ones. Point-blank targets, walls, leftward shots, piercing boss damage and final-lifetime hits have regression tests; weapon damage and fire rates are unchanged. Native button Enter/Space activation no longer also triggers game start/resume/jump, held Enter does not repeatedly retry, pointer-operated HUD buttons restore canvas focus, and the field-guide summary participates in the Dispatch focus loop.
 
 The audit suite exercises these edge cases, plus full 2D draw/HUD calls across all 100 stages and both extra modes using a stubbed canvas. These checks do not establish real-browser appearance, hardware performance or that no undiscovered issues remain.
+
+Expansion regressions cover grenade impact/fuse/idempotency and terrain occlusion, plating and piercing, ward consumption, Air Step limits, Focus heat/spread, Frost Pulse occlusion/pause, leaper warning/freeze, medic healing caps/self-exclusion/occlusion, later-wave rosters and all new 3D geometry paths. Real-browser appearance and device performance still need a deployable preview.
