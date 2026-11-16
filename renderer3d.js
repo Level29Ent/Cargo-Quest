@@ -165,12 +165,18 @@ try {
       box(gunX+face*21,feet+h*.56,15,10,3,6,'silver',0,'metal');
       shape('cylinder',gunX+face*(25+length/2),feet+h*.51,15,6,8,6,'silver',Math.PI/2,'metal',zAxis);
       box(gunX+face*32,feet+h*.51,20,12,2,2,w.color,0,'glow');
+      if(w.name==='Bayou Crossbow'){
+        limb(gunX+face*34,feet+h*.51-15,gunX+face*42,feet+h*.51,18,3,w.color);
+        limb(gunX+face*42,feet+h*.51,gunX+face*34,feet+h*.51+15,18,3,w.color);
+      }
+      if(w.name==='Grenade Launcher')shape('cylinder',gunX+face*25,feet+h*.51-4,16,16,22,16,w.color,Math.PI/2,'matte',zAxis);
+      if(w.name==='Nail Repeater')box(gunX+face*30,feet+h*.51+6,18,25,3,3,w.color);
       if(w.name==='Flamer'||w.name==='Plasma')orb(x-8,feet+h*.49,-10,14,23,13,w.color,'metal');
       if(body.flash>0){
         shape('cone',gunX+face*(36+length/2),feet+h*.51,15,12,25,12,'gold',-face*Math.PI/2,'glow',zAxis);
         orb(gunX+face*(34+length/2),feet+h*.51,15,10,10,10,'white','glow');
       }
-      if(window.__game.effects.shield>0){
+      if(window.__game.effects.shield>0 || window.__game.effects.barrier>0){
         for(let j=0;j<10;j++){const a=j*Math.PI/5;orb(x+Math.cos(a)*24,feet+h*.5+Math.sin(a)*40,5,3,3,3,'teal','glow');}
       }
     }else{
@@ -178,6 +184,20 @@ try {
       if(!body.dead && body.type==='shield')box(x+face*17,feet+h*.48,12,7,h*.65,20,body.guardBreak>0?'dark':'blue',0,'metal');
       if(!body.dead && body.type==='thrower')orb(x+face*18,feet+h*.7,12,12,12,12,body.attack<35?'red':'orange','glow');
       if(!body.dead && body.type==='thief'){box(x,feet+h*.65,14,20,5,4,'gold');box(x-face*8,feet+h*.5,-12,16,18,10,'gold');}
+      if(!body.dead && body.type==='plated'){box(x,feet+h*.53,14,width*.85,h*.4,6,'silver',0,'metal');box(x,feet+h*.9,5,width,7,26,'silver');}
+      if(!body.dead && body.type==='medic'){
+        box(x,feet+h*.55,14,20,21,5,'white');box(x,feet+h*.55,18,4,15,2,'red');box(x,feet+h*.55,18,14,4,2,'red');
+        if(body.attack<30)orb(x,feet+h+9,8,9,9,9,'green','glow');
+      }
+      if(!body.dead && body.type==='leaper'){
+        for(const dx of [-8,8])box(x+dx,feet+12,12,7,18,7,'orange');
+        if(body.attack<30)shape('cone',x,feet+h+10,8,12,14,8,'orange',Math.PI);
+      }
+      if(!body.dead && !boss && body.hp<body.maxHp){
+        box(x,feet+h+5,18,width,4,2,'dark',0,'cue');
+        const w=(width-2)*Math.max(0,body.hp/body.maxHp);
+        box(x-width/2+1+w/2,feet+h+5,20,w,2,2,'#ff675f',0,'cue');
+      }
       if(boss)shape('cone',x,feet+h+8,0,width*.9,20,20,'gold');
     }
   }
@@ -356,6 +376,10 @@ try {
     for(const shot of game.spits)orb(shot.x,448-shot.y,4,12,12,12,'green','glow');
     for(const p of game.parts.slice(-100)){
       if(p.kind==='boltpop'){kingCake(p.x,448-p.y);continue;}
+      if(p.kind==='blast'||p.kind==='frostpulse'){
+        const r=p.r*(1-p.t/(p.kind==='blast'?16:20));
+        for(let j=0;j<16;j++){const a=j*Math.PI/8;orb(p.x+Math.cos(a)*r,448-p.y+Math.sin(a)*r,12,4,4,4,p.kind==='blast'?'orange':'teal','glow');}continue;
+      }
       const dust=p.kind==='puff',size=dust?Math.max(2,7*p.t/14):4;
       orb(p.x,448-p.y,8,size,size,size,dust?'silver':p.kind==='gore'?'red':'gold',p.kind==='spark'?'glow':'matte');
     }
