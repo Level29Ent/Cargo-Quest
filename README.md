@@ -65,6 +65,24 @@ All rewards are cosmetic only and cost no coins. Equip independently in Dispatch
 
 Outfits and weapon colors appear in both render modes. Companions are animated HUD-layer drones in either mode, separate from the paid, functional Rescue Drone power. No reward changes damage, movement, heat, health or difficulty.
 
+## Daily Dispatch, Survival Arena and field guide
+
+Open **CAMPAIGN [C]** → **Extra Modes**. The expandable **Field Guide** explains all six enemy types, five boss signatures and both mode rule sets, without unlock gates. It is readable while gameplay is frozen by Dispatch.
+
+### Daily Dispatch
+
+The device's current UTC date selects one existing non-boss route and one of the six weapons. The date is captured at the start of an attempt; midnight does not relabel it, and Retry repeats that original day's contract. You start with three hearts and one life, no boss upgrades, no store, no free power caches and a locked weapon. Deliver the stage's cargo. You can clear without it, but that is not a successful delivery record. There are unlimited retries, and the result screen reports delivery/failure and active play time. R restarts the contract; Enter or tap retries the result. Dispatch always offers today's new contract.
+
+Successful delivery times retain the fastest result for each day. Cargo success and highest cleared-run score are also retained; a slower or missed-cargo clear never erases a better delivery. Only the newest 30 daily record dates are stored. This rotates existing routes rather than generating a new campaign or providing a server-controlled competition. The client clock and browser saves are not cheat-proof; there are no online rankings or currency rewards.
+
+### Survival Arena
+
+A separate closed, pit-free arena allows movement in both directions, with no scrolling, exit, stage timer, cargo or coin pickups. All six weapons are free to switch. You get three hearts, one life, no boss upgrades and no store. A two-second opening warning precedes the first wave. Waves start with five enemies, increasing by two per wave to a maximum of 18. Runners join at wave 2 and brutes at wave 4; their movement multiplier rises by 3.5% per wave to a maximum of 1.8×. Enemies spawn on the side away from you.
+
+Clearing a wave heals one heart and begins a two-second break. Hostile projectiles are removed and brief invulnerability protects the break. Every third completed wave grants ten seconds of Infinite Coolant. Cleared-wave and score records save locally at each wave clear and on defeat; this is not a resumable arena run. R restarts from wave 1. Results can be retried with Enter or tap. Pause, store restrictions and Dispatch freeze simulation as appropriate.
+
+Both modes are isolated from campaign checkpoints, campaign high scores, medals and the coin economy. No kill, bolt or completion in either mode changes the coin balance or grants extra lives. Returning to any campaign stage restores normal store and weapon behavior. Extra-mode records use the separate `cargoQuest2.modes.v1` key with validated loading and session-only fallback if storage is unavailable.
+
 ## Six free weapons
 
 All weapons are immediately available; there is no paid weapon gate or ammunition grind. Heat and cooldowns provide different trade-offs. Existing boss-reward weapon upgrades apply to the equipped weapon.
@@ -127,3 +145,5 @@ The existing `cargoQuest2.coins` browser-storage key is preserved. Coins remain 
 `npm test` checks renderer instance transforms across all 100 stages (with a stubbed GPU), all four geometry types, procedural material/sky creation, batch counts, the rendering toggle, and WebGL failure/context-loss fallback. It also executes the real game logic with stubbed browser/audio interfaces. It checks six firing patterns; fourteen purchases, effects, costs, expiry and persistence; all ten course mechanics; 100 distinct stage configurations; hazard placement; and the earlier 528 generated pit-platform crossings. `npm run build` bundles the renderer and static assets. Browser checks are separate: a passing simulation does not prove real iPhone/Safari multitouch, GPU performance, or a full playthrough of every course.
 
 Campaign regression tests additionally cover independent medals and best results, reward idempotency, save validation/reload/storage failure, cargo pickup/theft/recovery, all cosmetic thresholds, dispatch pause, tactical enemy behavior, and all five boss signatures with warning and enrage behavior. Full device playthroughs and real GPU performance remain separate manual checks.
+
+Extra-mode tests cover UTC-date route/loadout selection, daily retry/death/flag/result flows, isolation of campaign and coin saves, pause behavior, 40 wave progressions, spawn caps, healing/coolant, arena rendering, record reloading/retention and malformed/blocked storage.
