@@ -147,3 +147,11 @@ The existing `cargoQuest2.coins` browser-storage key is preserved. Coins remain 
 Campaign regression tests additionally cover independent medals and best results, reward idempotency, save validation/reload/storage failure, cargo pickup/theft/recovery, all cosmetic thresholds, dispatch pause, tactical enemy behavior, and all five boss signatures with warning and enrage behavior. Full device playthroughs and real GPU performance remain separate manual checks.
 
 Extra-mode tests cover UTC-date route/loadout selection, daily retry/death/flag/result flows, isolation of campaign and coin saves, pause behavior, 40 wave progressions, spawn caps, healing/coolant, arena rendering, record reloading/retention and malformed/blocked storage.
+
+### Correctness regression coverage
+
+Fatal hazards, enemies and projectiles now stop the active update before healing caches, boss rewards or exit medals can overwrite death. Cargo is collected after movement, including on the final step into a flag. Survival clears and their records are committed on the killing-shot tick rather than the next tick. Stage starts reset hazard phases so the same restart does not inherit a previous attempt's timing.
+
+Player bullets check the path from the player to the muzzle on their first tick, substep travel to prevent tunneling, and test frontmost enemies before farther ones. Point-blank targets, walls, leftward shots, piercing boss damage and final-lifetime hits have regression tests; weapon damage and fire rates are unchanged. Native button Enter/Space activation no longer also triggers game start/resume/jump, held Enter does not repeatedly retry, pointer-operated HUD buttons restore canvas focus, and the field-guide summary participates in the Dispatch focus loop.
+
+The audit suite exercises these edge cases, plus full 2D draw/HUD calls across all 100 stages and both extra modes using a stubbed canvas. These checks do not establish real-browser appearance, hardware performance or that no undiscovered issues remain.
