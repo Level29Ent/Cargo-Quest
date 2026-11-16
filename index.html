@@ -40,6 +40,14 @@
   #renderStatus{top:122px;bottom:auto;font-size:9px}
   @media(min-width:700px){#bWeapon{top:10px;left:140px}#bView{top:10px;right:130px}#courseStatus{top:50px}#renderStatus{top:72px}}
   @media (pointer:coarse){#touch{display:flex}}
+  #bCampaign{position:absolute;top:52px;right:90px;z-index:5;padding:9px;background:#243649;color:#fff;border:1px solid #74e8da;border-radius:6px;font:11px monospace;cursor:pointer}
+  #campaign{position:fixed;inset:12px;z-index:25;max-width:850px;margin:auto;padding:20px;box-sizing:border-box;overflow:auto;touch-action:pan-y;background:#101d2c;color:#e7f5ff;border:2px solid #74e8da;border-radius:12px;font:14px/1.6 monospace}
+  #campaign[hidden]{display:none} #campaign h1,#campaign h2{color:#ffe08a} #campaign h1{margin:0;font-size:24px} #campaign h2{font-size:17px}
+  #campaign button{background:#243b51;border:1px solid #74e8da;color:#fff;padding:10px;border-radius:5px;font:inherit;cursor:pointer} #campaign button:disabled{opacity:.45;cursor:not-allowed}
+  #campaign button[aria-pressed="true"]{background:#116d62;border-color:#ffe08a} #campaignClose{float:right} #stageMap{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px} #stageMap h3{grid-column:1/-1;margin:12px 0 0;font-size:13px}
+  #stageMap button{font-size:12px;padding:10px 4px} #cosmetics{display:flex;gap:7px;flex-wrap:wrap} #campaignSummary,#missionStatus{color:#b7f6e9} #missionStatus{position:absolute;top:138px;left:10px;right:10px;z-index:4;font:11px/1.5 monospace;pointer-events:none;text-shadow:1px 1px #000}
+  @media(min-width:700px){#bCampaign{top:10px;right:224px}#missionStatus{top:88px}}
+  @media(max-width:460px){#campaign{inset:6px;padding:12px}#stageMap{gap:4px}#stageMap button{font-size:10px}}
 </style>
 <script id="level29-google-tag-manager">
 (function(w,d){
@@ -76,6 +84,17 @@
     <p>Start a run to buy. Timed powers last 30 seconds of play; repeat purchases extend them. Powers reset on a new run.</p>
     <h2>FREE WEAPON LOADOUT</h2><div id="weapons"></div><h2>POWER-UPS</h2><p id="shopStatus" role="status" aria-live="polite"></p><div id="shopItems"></div>
   </section>
+  <button id="bCampaign">CAMPAIGN [C]</button><span id="missionStatus" aria-live="off"></span>
+  <section id="campaign" role="dialog" aria-modal="true" aria-labelledby="campaignTitle" hidden>
+    <button id="campaignClose">Close / Resume</button><h1 id="campaignTitle">CARGO DISPATCH</h1>
+    <p id="campaignSummary"></p><button id="continueCampaign">Continue campaign</button>
+    <p>Continue restarts your saved stage with a fresh loadout and three lives. Any stage remains playable. Saves stay on this browser; no account or cloud sync.</p>
+    <h2>DELIVERY CONTRACT</h2><p>Find the gold CARGO crate, carry it to the flag (or claim the boss reward). Thieves can knock it loose: recover the dropped crate. Cargo never reduces movement or weapon strength.</p>
+    <p>Three separate medals per stage: CLEAR, SPEED, CARGO. Earn them across different runs. First cargo delivery pays 25 base coins (Double Coins applies); delivery grades are GOLD (speed target) or SILVER. Speed uses active play time, not bought timer refills.</p>
+    <p>Enemy tactics: blue shields block one frontal hit, then stagger briefly; flank or follow up. Rooftop throwers lob projectiles. Gold-marked thieves steal cargo on contact. Regional bosses warn for one second before their signature attacks and intensify below 40% health.</p>
+    <h2>MEDAL REWARDS · COSMETICS ONLY</h2><div id="cosmetics"></div>
+    <h2>WORLD MAP · SELECT ANY STAGE</h2><p>Each button shows earned medals / 3 and your best time. Targets appear in play.</p><div id="stageMap"></div>
+  </section>
   <div id="touch">
     <div class="grp"><button id="bL" aria-label="Move left">&#9664;</button><button id="bR" aria-label="Move right">&#9654;</button></div>
     <div class="grp"><button id="bF" class="fire" aria-label="Fire">FIRE</button><button id="bJ" class="jump" aria-label="Jump">JUMP</button></div>
@@ -89,7 +108,7 @@ const VW = 800, VH = 448, T = 32, ROWS = 14, GROUND = 12*T;
 const TOTAL_LEVELS = 100;
 
 function fit(){
-  const top=innerWidth>=700?86:136;
+  const top=innerWidth>=700?116:166;
   const bottom=typeof matchMedia==='function' && matchMedia('(pointer:coarse)').matches?110:16;
   const available=Math.max(90,innerHeight-top-bottom);
   const s = Math.min(innerWidth / VW, available / VH);
@@ -436,7 +455,9 @@ function stopBossVoice(){ if (bossVoice){ try { bossVoice.src.stop(); } catch(e)
 const keys = {}; let jumpPressed = false, mouseFire = false;
 addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
+  if(campaignOpen){if(k==='escape')closeCampaign();return;}
   if (shopOpen){ if(k==='escape') closeShop(); return; }
+  if(k==='c' && !e.repeat){openCampaign();return;}
   if (k==='b'){ openShop(); return; }
   if (k==='q' && !e.repeat) cycleWeapon();
   if (/^[1-6]$/.test(k)) selectWeapon(Number(k)-1);
@@ -471,7 +492,7 @@ function bindBtn(id, key){
   b.addEventListener('pointerup',off);b.addEventListener('pointercancel',off);b.addEventListener('lostpointercapture',off);
 }
 function togglePause(){
-  if(shopOpen || !['play','pause'].includes(state))return;
+  if(shopOpen || campaignOpen || !['play','pause'].includes(state))return;
   releaseControls();state=state==='play'?'pause':'play';
 }
 function suspendGame(){
@@ -560,6 +581,25 @@ function decorateCourse(level){
     level.elements.push({x:x*T,w:3*T,kind,phase:(x*13+level.i*19)%240});
     if(kind==='supply')level.grid[8][x+1]='?';
   }
+  // Cargo sits on open, intact street with no element strip or overhead obstacle.
+  const safe=[];
+  for(let x=16;x<(level.info.isBoss?19:level.flagX-8);x++){
+    if([0,1].every(k=>level.grid[12][x+k]==='#' && [9,10,11].every(y=>level.grid[y][x+k]===' ')) &&
+       !level.elements.some(e=>x*T<e.x+e.w && (x+2)*T>e.x))safe.push(x);
+  }
+  const cargoX=safe.length?safe[Math.floor(safe.length*.55)]*T:9*T;
+  level.cargo={x:cargoX,y:GROUND-18,carried:false,delivered:false,lock:0};
+  level.runTicks=0;level.recorded=false;
+  // Deterministic tactical variants; keep the original layouts and jump routes intact.
+  if(!level.info.isBoss)level.zs.forEach((z,n)=>{
+    if(level.i>=2 && n%4===0){z.type='shield';z.hp=3;z.maxHp=3;}
+    else if(level.i>=4 && n%4===1){z.type='thief';z.speed=1.8;}
+    else if(level.i>=6 && n%4===2){
+      const tx=Math.floor(z.x/T);
+      const perch=Array.from({length:13},(_,k)=>tx+k-6).find(x=>x>0 && x<level.W && SOLID.has(level.grid[8][x]) && level.grid[7][x]===' ' && level.grid[6][x]===' ');
+      if(perch!==undefined){z.x=perch*T+3;z.type='thrower';z.y=8*T-z.h;z.speed=0;z.attack=90;}
+    }
+  });
   // Reachable, free power caches create variety without spending saved coins.
   level.pickups=[{x:7*T,y:GROUND-30,id:SHOP_POWERS[(level.i+8)%SHOP_POWERS.length].id,got:false}];
   return level;
@@ -666,6 +706,97 @@ let popups = [], parts = [], bumps = [], bullets = [], spits = [], combo = 0, st
 let frame = 0, shake = 0, banner = null, bossBarShow = 0;
 let shopOpen = false, effects = {}, wallet = 0;
 try { const saved = Number(localStorage.getItem('cargoQuest2.coins')); if(Number.isSafeInteger(saved) && saved >= 0) wallet = saved; } catch(e) {}
+let campaignOpen=false, campaignFocus=null, storageOK=true;
+const CAMPAIGN_KEY='cargoQuest2.campaign.v1';
+const COSMETICS=[
+  {id:'classic',slot:'outfit',name:'Classic Jester',need:0,color:'#9259c7'},
+  {id:'courier',slot:'outfit',name:'Coastal Courier',need:3,color:'#31bcb7'},
+  {id:'sunset',slot:'outfit',name:'Sunset Jester',need:15,color:'#ff675f'},
+  {id:'royal',slot:'outfit',name:'Royal Dispatch',need:45,color:'#ffd25d'},
+  {id:'steel',slot:'skin',name:'Steel weapon',need:0,color:'#bac5d1'},
+  {id:'mint',slot:'skin',name:'Mint weapon',need:6,color:'#78d6a0'},
+  {id:'gold',slot:'skin',name:'Gold weapon',need:24,color:'#ffd25d'},
+  {id:'none',slot:'drone',name:'No companion',need:0,color:'#bac5d1'},
+  {id:'scout',slot:'drone',name:'Scout companion',need:12,color:'#6ec4e8'},
+  {id:'bee',slot:'drone',name:'Bumble companion',need:36,color:'#ffd25d'}
+];
+function emptyCampaign(){return {version:1,stage:0,best:0,stages:{},equipped:{outfit:'classic',skin:'steel',drone:'none'}};}
+function loadCampaign(){
+  const clean=emptyCampaign();
+  try{
+    const raw=JSON.parse(localStorage.getItem(CAMPAIGN_KEY));
+    if(!raw || raw.version!==1)return clean;
+    if(Number.isInteger(raw.stage) && raw.stage>=0 && raw.stage<TOTAL_LEVELS)clean.stage=raw.stage;
+    if(Number.isSafeInteger(raw.best) && raw.best>=0)clean.best=raw.best;
+    for(let i=0;i<TOTAL_LEVELS;i++){
+      const r=raw.stages?.[i];if(!r || typeof r!=='object')continue;
+      clean.stages[i]={clear:r.clear===true,speed:r.speed===true,cargo:r.cargo===true,
+        ticks:Number.isSafeInteger(r.ticks)&&r.ticks>0?r.ticks:null,
+        grade:['GOLD','SILVER'].includes(r.grade)?r.grade:null};
+    }
+    const count=medalCount(clean);
+    for(const slot of ['outfit','skin','drone'])if(COSMETICS.some(c=>c.slot===slot && c.id===raw.equipped?.[slot] && c.need<=count))clean.equipped[slot]=raw.equipped[slot];
+  }catch(e){storageOK=false;}
+  return clean;
+}
+function medalCount(data=campaign){return Object.values(data.stages).reduce((n,r)=>n+Number(r.clear)+Number(r.speed)+Number(r.cargo),0);}
+let campaign=loadCampaign();best=campaign.best;startPick=campaign.stage;
+function saveCampaign(){try{localStorage.setItem(CAMPAIGN_KEY,JSON.stringify(campaign));storageOK=true;}catch(e){storageOK=false;}}
+function cosmetic(slot){return COSMETICS.find(c=>c.slot===slot && c.id===campaign.equipped[slot]);}
+function equipCosmetic(id){const c=COSMETICS.find(c=>c.id===id);if(!c || c.need>medalCount())return false;campaign.equipped[c.slot]=id;saveCampaign();return true;}
+function targetTicks(level=L){return (level.info.isBoss?100:Math.ceil(level.W*T/150)+12)*60;}
+function finishStage(){
+  if(L.recorded)return;L.recorded=true;
+  const old=campaign.stages[L.i]||{}, delivered=L.cargo.carried;
+  const fast=L.runTicks<=targetTicks(), grade=delivered?(fast?'GOLD':'SILVER'):null;
+  campaign.stages[L.i]={clear:true,speed:!!old.speed||fast,cargo:!!old.cargo||delivered,
+    ticks:Math.min(old.ticks||Infinity,Math.max(1,L.runTicks)),grade:old.grade==='GOLD'?'GOLD':grade||old.grade||null};
+  if(delivered){L.cargo.delivered=true;if(!old.cargo)earnCoins(25);}
+  campaign.stage=Math.min(TOTAL_LEVELS-1,L.i+1);campaign.best=Math.max(campaign.best,score);best=campaign.best;saveCampaign();
+  banner={txt:delivered?'CARGO DELIVERED':'STAGE COMPLETE',sub:(grade?grade+' DELIVERY · ':'')+'MEDALS '+medalCount()+'/300',t:180};
+}
+function updateCargo(){
+  const c=L.cargo;if(c.lock>0)c.lock--;
+  if(!c.carried && !c.delivered && !c.lock && Math.abs(player.x+player.w/2-c.x)<30 && Math.abs(player.y+player.h/2-c.y)<48){
+    c.carried=true;snd('crate');popups.push({x:c.x,y:c.y,t:90,txt:'CARGO SECURED'});
+  }
+}
+function dropCargo(z){
+  const c=L.cargo;if(!c.carried)return;
+  c.carried=false;c.lock=60;
+  // Keep recovery ahead of the one-way camera, on open street rather than in a pit.
+  const desired=Math.floor((player.safeX||player.x)/T),safe=[];
+  for(let x=Math.ceil(cam/T)+1;x<(L.flagX>0?L.flagX-1:L.W-2);x++)
+    if(L.grid[12][x]==='#' && L.grid[11][x]===' ' && L.grid[10][x]===' ')safe.push(x);
+  safe.sort((a,b)=>Math.abs(a-desired)-Math.abs(b-desired));
+  c.x=safe.length?safe[0]*T:player.x;c.y=GROUND-18;
+  popups.push({x:player.x,y:player.y,t:90,txt:'THIEF! RECOVER CARGO'});z.flee=120;
+}
+function renderCampaign(){
+  document.getElementById('campaignSummary').textContent=medalCount()+'/300 medals · Best score '+campaign.best+' · Saved stage '+(campaign.stage+1)+(storageOK?' · Saved on this browser.':' · Storage unavailable: session only.');
+  document.getElementById('continueCampaign').textContent='Continue · Stage '+(campaign.stage+1);
+  const rewards=document.getElementById('cosmetics');rewards.replaceChildren();
+  COSMETICS.forEach(c=>{const b=document.createElement('button');b.id='cosmetic-'+c.id;b.textContent=c.name+' · '+c.need+' medals';b.disabled=c.need>medalCount();b.setAttribute('aria-pressed',String(campaign.equipped[c.slot]===c.id));b.addEventListener('click',()=>{equipCosmetic(c.id);renderCampaign();document.getElementById('cosmetic-'+c.id).focus();});rewards.append(b);});
+  const map=document.getElementById('stageMap');map.replaceChildren();
+  for(let i=0;i<TOTAL_LEVELS;i++){
+    if(i%5===0){const h=document.createElement('h3');h.textContent=levelInfo(i).loc.city+' · Route '+(Math.floor(i/25)+1);map.append(h);}
+    const r=campaign.stages[i]||{},b=document.createElement('button');
+    b.textContent=(i+1)+(i%5===4?' BOSS':'')+' · '+[r.clear,r.speed,r.cargo].filter(Boolean).length+'/3'+(r.ticks?' · '+(r.ticks/60).toFixed(1)+'s':'');
+    b.setAttribute('aria-label','Stage '+(i+1)+', '+(r.clear?'clear medal, ':'')+(r.speed?'speed medal, ':'')+(r.cargo?'cargo medal '+r.grade+', ':'')+'play');
+    b.addEventListener('click',()=>{closeCampaign();newGame(i);});map.append(b);
+  }
+}
+function openCampaign(){if(shopOpen)closeShop();campaignFocus=document.activeElement;campaignOpen=true;releaseControls();renderCampaign();document.getElementById('campaign').hidden=false;document.getElementById('campaignClose').focus();}
+function closeCampaign(){campaignOpen=false;releaseControls();document.getElementById('campaign').hidden=true;(campaignFocus||document.getElementById('bCampaign')).focus();}
+document.getElementById('bCampaign').addEventListener('click',openCampaign);
+document.getElementById('campaignClose').addEventListener('click',closeCampaign);
+document.getElementById('continueCampaign').addEventListener('click',()=>{closeCampaign();newGame(campaign.stage);});
+document.getElementById('campaign').addEventListener('keydown',e=>{
+  if(e.key!=='Tab')return;
+  const buttons=[...document.querySelectorAll('#campaign button:not(:disabled)')],first=buttons[0],last=buttons[buttons.length-1];
+  if(e.shiftKey && document.activeElement===first){e.preventDefault();last.focus();}
+  else if(!e.shiftKey && document.activeElement===last){e.preventDefault();first.focus();}
+});
 resetUpgrades();
 
 // Eight additional shop powers; existing boss rewards are unchanged.
@@ -752,6 +883,7 @@ function purchasePower(id){
   snd('power'); renderShop(); return true;
 }
 function openShop(){
+  if(campaignOpen)return;
   shopOpen=true; releaseControls(); document.getElementById('shop').hidden=false;
   document.getElementById('shopStatus').textContent=['play','pause'].includes(state)?'Game paused while shopping.':'Start a run first, then open the store.';
   renderShop(); document.getElementById('shopClose').focus();
@@ -768,13 +900,13 @@ document.getElementById('shop').addEventListener('keydown',e=>{
 });
 refreshWallet();
 
-function saveBest(){ if (score > best) best = score; }
+function saveBest(){ if (score > best){best=score;campaign.best=best;saveCampaign();} }
 function pickStart(dir){ startPick = (startPick + dir + TOTAL_LEVELS) % TOTAL_LEVELS; }
 function newGame(from){
   score = 0; boltCount = 0; lives = 3; effects = {}; vampireKills=0; selectWeapon(0); resetUpgrades();
   const blocks = Math.floor(from / 5);
   for (let k=0;k<blocks;k++) applyPower(k, false);
-  startLevel(from);
+  campaign.stage=from;saveCampaign();startLevel(from);
 }
 function startLevel(i){
   releaseControls();
@@ -894,12 +1026,35 @@ function fire(){
 }
 
 // ---------- Boss ----------
+const SIGNATURES={nola:'VOODOO CALL · clear the reinforcements',la:'SUNSET DASH · jump over the charge',hou:'BAYOU QUAKE · jump the ground waves',lej:'GUNNY BARRAGE · move from the landing zone',pi:'DRILL STRIKES · leave the marked street'};
+function updateSignature(B){
+  if(B.signatureWarning>0){
+    B.signatureWarning--;B.vx=0;
+    if(B.signatureWarning===0){
+      const hard=B.hp<B.maxHp*.4,kind=L.info.loc.id;
+      if(kind==='nola'){
+        for(let n=0;n<(hard?3:2);n++)if(L.zs.filter(z=>z.alive&&!z.dead).length<7){const z=makeZombie(Math.max(21*T,Math.min(42*T,B.targetX+(n?80:-80))),'walker',kind);z.active=true;L.zs.push(z);}
+      }else if(kind==='la'){B.mode='signatureDash';B.timer=hard?42:32;B.dashFace=B.targetX<B.x?-1:1;}
+      else if(kind==='hou')for(const dir of [-1,1])for(let n=0;n<(hard?2:1);n++)spits.push({wave:true,x:B.x+B.w/2-dir*n*90,y:GROUND-14,vx:dir*5,t:100});
+      else if(kind==='lej')for(let n=0;n<(hard?5:3);n++)spits.push({x:B.x+B.w/2,y:B.y+5,vx:(B.targetX-B.x-B.w/2+(n-(hard?2:1))*50)/45,vy:-5,t:150});
+      else if(kind==='pi')B.strikeTicks=hard?35:24;
+      B.signatureCd=hard?240:360;
+    }
+    return true;
+  }
+  if(B.strikeTicks>0){B.strikeTicks--;if(player.onGround && B.targets.some(x=>Math.abs(player.x+player.w/2-x)<28))hurtPlayer(B.targetX);}
+  if(--B.signatureCd<=0 && B.mode==='walk'){
+    B.targetX=player.x+player.w/2;B.targets=[B.targetX-90,B.targetX,B.targetX+90];B.signatureWarning=60;
+    banner={txt:'BOSS WARNING',sub:SIGNATURES[L.info.loc.id],t:60};return true;
+  }
+  return false;
+}
 function spawnBoss(){
   const info = L.info, b = info.loc.boss;
   const final = L.i === TOTAL_LEVELS - 1;
   const hp = Math.round((40 + L.i * 2.2) * (final ? 1.6 : 1));
   L.boss = { x:38*T, y:GROUND-100, w:64, h:100, vx:0, vy:0, hp, maxHp:hp, face:-1, timer:90, mode:'walk', flash:0, anim:0,
-             spec:b, name: final ? 'ZOMBIE OVERLORD ' + b.name.split(' ').pop() : b.name, speed: .9 + L.d*1.4, dead:false, deadT:0, onGround:false, keepVx:true };
+             signatureCd:150,signatureWarning:0,strikeTicks:0,targets:[],spec:b, name: final ? 'ZOMBIE OVERLORD ' + b.name.split(' ').pop() : b.name, speed: .9 + L.d*1.4, dead:false, deadT:0, onGround:false, keepVx:true };
   L.bossSpawned = true; bossBarShow = 1; snd('roar'); snd('boss'); shake = 10;
   banner = { txt:'BOSS FIGHT', sub:L.boss.name, t:130 };
   L.boss.tauntT = 540; L.boss.enrageSaid = false; L.boss.tauntN = 0;
@@ -924,7 +1079,10 @@ function updateBoss(){
   if (--B.tauntT <= 0){ bossSay(1 + (B.tauntN++ % 2)); B.tauntT = 480 + Math.random()*300; }
   if(B.slow>0)B.slow--;
   const spd = B.speed * (enraged ? 1.5 : 1)*(B.slow>0?.4:1);
-  if (B.mode==='walk'){
+  const warning=updateSignature(B);
+  if(warning){B.vx=0;}
+  else if(B.mode==='signatureDash'){B.face=B.dashFace;B.vx=B.dashFace*(enraged?8:6);if(B.timer<=0 || B.hitWall){B.mode='walk';B.timer=100;}}
+  else if (B.mode==='walk'){
     B.vx = B.face * spd;
     if (B.timer <= 0){
       const r = Math.random();
@@ -979,7 +1137,7 @@ function damageBoss(n){
 
 // ---------- Update ----------
 function update(){
-  if(shopOpen || state==='pause') return;
+  if(shopOpen || campaignOpen || state==='pause') return;
   frame++;
   if (shake > 0) shake *= .85, shake < .3 && (shake = 0);
   if (state==='title' || state==='gameover' || state==='win'){ jumpPressed = false; return; }
@@ -997,6 +1155,7 @@ function update(){
   if (state==='clear'){ updateClear(); updateFx(); return; }
 
   const p = player;
+  L.runTicks++;updateCargo();
   for(const id in effects) if(effects[id]>0) effects[id]--;
   timeAcc += 1/60;
   if (timeAcc >= .4){ timeAcc -= .4; time--; if (time===100 && !hurried){ hurried = true; snd('hurry'); } if (time<=0){ time=0; killPlayer(); return; } }
@@ -1090,6 +1249,11 @@ function update(){
     const dx = (p.x + p.w/2) - (z.x + z.w/2);
     if (Math.abs(dx) < 520 && z.onGround) z.dir = dx < 0 ? -1 : 1;
     if(z.slow>0)z.slow--;
+    if(z.guardBreak>0)z.guardBreak--;
+    if(z.flee>0){z.flee--;z.dir=dx<0?1:-1;}
+    if(z.type==='thrower' && --z.attack<=0){
+      spits.push({x:z.x+z.w/2,y:z.y+10,vx:Math.max(-7,Math.min(7,dx/45)),vy:-7,t:160});z.attack=150;snd('spit');
+    }
     const sp = (z.slow>0?.35:1)*(z.type==='runner' && Math.abs(dx) > 260 ? z.speed*.5 : z.speed);
     z.vx = z.dir * sp;
     z.vy = Math.min(z.vy + .6, 10);
@@ -1104,7 +1268,7 @@ function update(){
         p.vy = jumpHeld() ? -11 : -7; snd('stomp');
         if (z.type==='brute'){ z.hp -= 3; z.flash = 5; if (z.hp<=0) killZombie(z, p.face); else addScore(100, z.x+z.w/2, z.y); }
         else { combo++; const pts = [100,200,400,800,1000,2000][Math.min(combo-1,5)]; z.pts = pts; combo--; killZombie(z, p.face); }
-      } else hurtPlayer(z.x + z.w/2);
+      } else {if(z.type==='thief' && p.inv<=0 && L.cargo.carried)dropCargo(z);hurtPlayer(z.x + z.w/2);}
     }
   }
 
@@ -1121,6 +1285,9 @@ function update(){
     for (const z of L.zs){
       if (!z.alive || z.dead || !z.active || b.hit.has(z)) continue;
       if (b.x > z.x && b.x < z.x + z.w && b.y > z.y && b.y < z.y + z.h){
+        if(z.type==='shield' && !z.guardBreak && Math.sign(b.vx)===-z.dir){
+          z.guardBreak=45;b.life=0;parts.push({kind:'spark',x:b.x,y:b.y,t:8});snd('bump');break;
+        }
         registerHit(b.x,b.y);
         if(b.slow)z.slow=180;
         z.hp -= b.dmg; z.flash = 4; b.hit.add(z); z.x += Math.sign(b.vx) * (z.type==='brute' ? .8 : 2.5);
@@ -1160,13 +1327,13 @@ function update(){
       p.health = maxHealth();
       snd('power'); L.crate = null;
       banner = { txt:'POWER-UP', sub:name, t:200 };
-      state = 'clear'; clearPhase = 2; stateTimer = 0;
+      finishStage();popups.push({x:c.x,y:c.y,t:180,txt:name});state = 'clear'; clearPhase = 2; stateTimer = 0;
     }
   }
 
   // flag pole
   if (L.flagX > 0 && p.x + p.w >= L.flagX*T - 4){
-    state='clear'; clearPhase = 0; snd('flag');
+    finishStage();state='clear'; clearPhase = 0; snd('flag');
     const h = Math.max(0, 11*T - (p.y+p.h));
     const bonus = h > 7*T ? 5000 : h > 5*T ? 2000 : h > 3*T ? 800 : h > T ? 400 : 100;
     addScore(bonus, L.flagX*T + 20, p.y);
@@ -1542,6 +1709,13 @@ function drawLevel(){
     if(['steam','storm'].includes(e.kind) && phase>=180 && phase<215)cx.fillRect(e.x,GROUND-60,e.w,60);
   }
   for(const cache of L.pickups||[])if(!cache.got){cx.fillStyle='#79ffdf';cx.fillRect(cache.x-12,cache.y-12,24,24);sh('+',cache.x,cache.y,'#142d3a',12,'center');}
+  const cargo=L.cargo;
+  if(cargo && !cargo.delivered){const x=cargo.carried?player.x+player.w/2:cargo.x,y=cargo.carried?player.y-18:cargo.y;
+    cx.fillStyle='#ffd25d';cx.fillRect(x-13,y-13,26,26);cx.fillStyle='#513a1d';cx.fillRect(x-2,y-13,4,26);sh('CARGO',x,y-20,'#ffe08a',7,'center');}
+  if(L.boss && !L.boss.dead && (L.boss.signatureWarning>0 || L.boss.strikeTicks>0)){
+    cx.fillStyle=L.boss.strikeTicks>0?'#ff675f':'#ffd25d';
+    for(const x of (L.info.loc.id==='pi'?L.boss.targets:[L.boss.x+L.boss.w/2])){cx.fillRect(x-26,GROUND-5,52,5);sh('!',x,GROUND-18,'#ffe08a',14,'center');}
+  }
   // safe-zone exit
   if (L.flagX > 0){
     const ex = L.exitX*T;
@@ -1686,6 +1860,11 @@ function drawZombie(z){
   cx.restore();
   cx.restore();
   cx.restore();
+  if(!z.dead){
+    if(z.type==='shield'){cx.fillStyle=z.guardBreak>0?'#666':'#6ec4e8';cx.fillRect(z.x+z.w/2+z.dir*16-4,z.y+14,8,30);}
+    if(z.type==='thrower')sh('LOB',z.x+z.w/2,z.y-12,'#ffab65',7,'center');
+    if(z.type==='thief')sh('THIEF',z.x+z.w/2,z.y-12,'#ffe08a',7,'center');
+  }
   // brute health bar
   if (z.type==='brute' && !z.dead && z.hp < z.maxHp){
     cx.fillStyle = '#000'; cx.fillRect(z.x, z.y - 10, z.w, 5); cx.fillStyle = '#e83a3a'; cx.fillRect(z.x+1, z.y-9, (z.w-2)*z.hp/z.maxHp, 3);
@@ -1764,8 +1943,8 @@ function drawPlayer(p){
   cx.fillStyle = '#2f3416'; cx.fillRect(-7, 23, 4, 3); cx.fillRect(3, 25, 5, 3);
   cx.fillStyle = '#6b6b3a'; cx.fillRect(-2, 22, 4, 3);
   cx.fillStyle = '#1a1a1a'; cx.fillRect(-10, 21, 20, 2);
-  // torso: black shirt
-  cx.fillStyle = '#0c0c0c'; cx.fillRect(-10, 8, 20, 15);
+  // Medal-earned outfit (visual only).
+  cx.fillStyle = cosmetic('outfit').color; cx.fillRect(-10, 8, 20, 15);
   cx.fillStyle = '#222'; cx.fillRect(-10, 8, 20, 2);
   if (up.armor > 0){ cx.fillStyle = '#3a3f2a'; cx.fillRect(-9, 10, 18, 11); cx.fillStyle = '#2a2e1e'; cx.fillRect(-9, 15, 18, 2); }
   cx.fillStyle = '#f5b800'; cx.font = '5px "Press Start 2P", monospace'; cx.textAlign='center'; cx.fillText('29', -1, 18);
@@ -1778,7 +1957,7 @@ function drawPlayer(p){
   cx.fillStyle = '#2b2b2b'; cx.fillRect(-3, 11, 22, 8);                                         // receiver
   cx.fillStyle = '#111';    cx.fillRect(-3, 10, 22, 2);                                         // feed cover
   cx.fillStyle = '#1b1b1b'; cx.fillRect(5, 7, 9, 2); cx.fillRect(6, 7, 2, 4); cx.fillRect(12, 7, 2, 4); // carry handle
-  cx.fillStyle = '#3a3a3a'; cx.fillRect(19, 13, 18, 3);                                         // barrel
+  cx.fillStyle = cosmetic('skin').color; cx.fillRect(19, 13, 18, 3);                                         // barrel
   cx.fillStyle = '#2b2b2b'; cx.fillRect(19, 16, 12, 2);                                         // gas tube
   cx.fillStyle = '#1b1b1b'; cx.fillRect(36, 12, 4, 5);                                          // flash hider
   cx.fillRect(33, 10, 2, 3);                                                                    // front sight
@@ -1941,14 +2120,18 @@ function loop(now){
   updateMusic();
   const view=window.Cargo3D;
   if(view && view.enabled){cx.clearRect(0,0,VW,VH);view.render(window.__game);}else drawLevel();
+  if(cosmetic('drone').id!=='none' && ['play','pause','clear'].includes(state)){
+    const x=player.x-cam-25,y=player.y-26+Math.sin(frame*.08)*4;cx.fillStyle=cosmetic('drone').color;cx.fillRect(x-8,y-5,16,10);cx.fillStyle='#fff';cx.fillRect(x-16,y-9,12,2);cx.fillRect(x+4,y-9,12,2);
+  }
   drawHUD(); drawScreens();
   document.getElementById('bPause').textContent=state==='pause'?'RESUME [P]':'PAUSE [P]';
   document.getElementById('courseStatus').textContent=state==='play' || state==='pause' ? L.info.course.name+' · '+L.info.course.hint : '';
+  document.getElementById('missionStatus').textContent=['play','pause','clear','intro'].includes(state)?'CARGO: '+(L.cargo.delivered?'DELIVERED':L.cargo.carried?'SECURED · reach the exit':'find the gold crate')+' · '+(L.runTicks/60).toFixed(1)+'s / '+(targetTicks()/60)+'s speed target'+(state==='clear'?' · '+medalCount()+'/300 medals':''):'';
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
 window.__game = { get state(){return state;}, get score(){return score;}, get time(){return time;}, get lives(){return lives;},
-  get player(){return player;}, get cam(){return cam;},get frame(){return frame;},get bullets(){return bullets;},get spits(){return spits;},get parts(){return parts;},get effects(){return effects;},get weapon(){return WEAPONS[weaponIndex];},get flagY(){return flagY;}, get L(){return L;}, get up(){return up;}, get level(){return levelIdx;},
+  get player(){return player;}, get cam(){return cam;},get frame(){return frame;},get bullets(){return bullets;},get spits(){return spits;},get parts(){return parts;},get effects(){return effects;},get cosmetic(){return {outfit:cosmetic('outfit').color,skin:cosmetic('skin').color};},get weapon(){return WEAPONS[weaponIndex];},get flagY(){return flagY;}, get L(){return L;}, get up(){return up;}, get level(){return levelIdx;},
   goto(i){ newGame(i); }, start: onEnter, get music(){ return mus.name; }, get musicStep(){ return mus.step; }, get actx(){ return actx; }, get master(){ return master; }, get soundMode(){ return soundMode; }, get vo(){ return Object.keys(voBufs).length; }, get subtitle(){ return subtitle; }, get zv(){ return [zVoiceUntil, zDeathUntil, actx ? actx.currentTime : 0]; } };
 })();
 </script>

@@ -22,6 +22,7 @@ Background buildings, cars, trees and lamps use a muted blue-grey material pass;
 - Fire: F/J/Z/K or mouse. Sprint: Shift/X. Mobile: onscreen movement, FIRE, JUMP.
 - Weapon: Q, keys 1–6, the top-left weapon button, or the free loadout in the store.
 - Start/resume: Enter or tap. Pause: P. Restart stage: R. Title arrows select any starting stage.
+- Campaign: CAMPAIGN button or C. Escape closes it.
 - Store: STORE button or B. Escape closes it. Shopping pauses gameplay and effect timers.
 
 ## Responsive game feel
@@ -31,6 +32,38 @@ Ground contact remains stable under subpixel gravity. Normal ground acceleration
 Touch buttons use captured Pointer Events with per-button pointer ownership, so releasing FIRE cannot cancel movement or another finger. The onscreen pause/resume button works alongside P. Losing window focus or hiding the page clears held controls and pauses active gameplay; resume explicitly. Pause and shopping freeze simulation/hazard timers. New stages clear stale held inputs.
 
 Successful shots display a short hit-confirmation marker in both render modes, damage shows a brief border flash, and solid landings emit dust. 3D weapons now use the existing recoil value. No hit-stop, forced camera shake, new currency charges, or weapon damage changes are introduced. Existing saved coins and course layouts are preserved.
+
+## Cargo contracts, campaign and medals
+
+Open **CAMPAIGN [C]** (or press C) for Cargo Dispatch. It pauses simulation just like the store, supports Escape, traps keyboard focus, and includes a 100-stage world map grouped by regional routes. Every stage remains freely selectable. **Continue** restarts the saved stage with three lives and the existing stage-appropriate boss upgrades; it is a stage checkpoint, not a mid-frame save. Starting another stage updates that checkpoint.
+
+Every stage has an optional gold cargo crate on open street. Collect it and reach the flag, or claim the defeated boss's reward, to deliver it. Cargo does not slow movement or change combat stats. A thief's contact can drop it onto visible open street for recovery after a one-second lockout. Death/restart resets that attempt's cargo and stopwatch. Completing without cargo still advances the campaign.
+
+Each stage has three independent medals: **CLEAR**, **SPEED**, and **CARGO**, earnable across separate attempts (300 total). Speed uses active simulation time: normal-stage targets are `ceil(stageWidth * 32 / 150) + 12` seconds; boss stages allow 100 seconds. Pausing, shopping and dispatch do not count; buying timer refills cannot improve a speed result. A fast delivery earns GOLD, otherwise SILVER. The best delivery grade and fastest clear are retained. The first delivery per stage pays 25 base coins (Double Coins applies); replaying or repeated completion callbacks cannot repeat that bonus.
+
+Stage checkpoint, medals, best times, delivery grades, high score and equipped cosmetics save under `cargoQuest2.campaign.v1`. The existing coin key is untouched. These are local, non-authoritative browser saves: no account, backend, leaderboard or cloud sync. Different origins/devices do not share saves. Missing/corrupt saves fall back safely, and blocked storage leaves session-only progress. No existing coin balance is migrated or reset.
+
+### Tactical enemies and regional boss signatures
+
+Variants progressively join the existing generated enemy roster without modifying platform geometry:
+
+- **Shield zombies** (stage 3 onward): blue frontal shield blocks one hit, then staggers for 45 ticks. Follow up, attack from behind, or stomp.
+- **Cargo thieves** (stage 5 onward): faster gold-marked enemies knock carried cargo loose on contact, then flee briefly.
+- **Rooftop throwers** (stage 7 onward): occupy existing raised block perches and periodically lob ballistic projectiles. Freezing pauses their attacks.
+
+Every regional boss retains its original attacks and gains a signature after a full one-second warning: New Orleans summons a bounded reinforcement group; Los Angeles locks a dash direction; Houston releases ground waves; Camp Lejeune lobs a projectile fan; Parris Island strikes three marked street positions. Jumping avoids ground strikes. Below 40% health, signature cadence increases from six to four seconds and attack counts/durations intensify. Boss warning timers freeze with pause, shopping, dispatch and Freeze Wave. Both renderers show warning markers and tactical enemy cues.
+
+### Medal-earned cosmetics
+
+All rewards are cosmetic only and cost no coins. Equip independently in Dispatch:
+
+| Slot | Rewards and required total medals |
+| --- | --- |
+| Outfit | Classic Jester (0), Coastal Courier (3), Sunset Jester (15), Royal Dispatch (45) |
+| Weapon finish | Steel (0), Mint (6), Gold (24) |
+| Companion | None (0), Scout (12), Bumble (36) |
+
+Outfits and weapon colors appear in both render modes. Companions are animated HUD-layer drones in either mode, separate from the paid, functional Rescue Drone power. No reward changes damage, movement, heat, health or difficulty.
 
 ## Six free weapons
 
@@ -92,3 +125,5 @@ The existing `cargoQuest2.coins` browser-storage key is preserved. Coins remain 
 ## Verification
 
 `npm test` checks renderer instance transforms across all 100 stages (with a stubbed GPU), all four geometry types, procedural material/sky creation, batch counts, the rendering toggle, and WebGL failure/context-loss fallback. It also executes the real game logic with stubbed browser/audio interfaces. It checks six firing patterns; fourteen purchases, effects, costs, expiry and persistence; all ten course mechanics; 100 distinct stage configurations; hazard placement; and the earlier 528 generated pit-platform crossings. `npm run build` bundles the renderer and static assets. Browser checks are separate: a passing simulation does not prove real iPhone/Safari multitouch, GPU performance, or a full playthrough of every course.
+
+Campaign regression tests additionally cover independent medals and best results, reward idempotency, save validation/reload/storage failure, cargo pickup/theft/recovery, all cosmetic thresholds, dispatch pause, tactical enemy behavior, and all five boss signatures with warning and enrage behavior. Full device playthroughs and real GPU performance remain separate manual checks.

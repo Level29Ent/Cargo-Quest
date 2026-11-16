@@ -9,7 +9,8 @@ function el(){return {set width(v){this._width=v;drawing.imageSmoothingEnabled=t
 const listeners={};
 const sandbox={console,Math,Set,Image:function(){},innerWidth:390,innerHeight:844,performance:{now:()=>0},requestAnimationFrame(){},setTimeout(){},addEventListener(name,fn){listeners[name]=fn;},document:{getElementById:id=>nodes[id]??=el(),createElement:()=>el(),querySelectorAll:()=>[],addEventListener(name,fn){listeners[name]=fn;}},localStorage:{getItem:k=>store[k]??null,setItem:(k,v)=>store[k]=v}};
 sandbox.window=sandbox;
-src=src.replace('window.__game =',`window.test={buildLevel,moveBody,newGame,update,openShop,closeShop,purchasePower,earnCoins,addBolt,killZombie,hurtPlayer,fire,spawnBoss,SHOP_POWERS,WEAPONS,selectWeapon,grantPower,COURSES,fit,drawHUD,togglePause,releaseControls,
+src=src.replace('window.__game =',`window.test={buildLevel,moveBody,newGame,update,openShop,closeShop,purchasePower,earnCoins,addBolt,killZombie,hurtPlayer,fire,spawnBoss,SHOP_POWERS,WEAPONS,selectWeapon,grantPower,COURSES,fit,drawHUD,togglePause,releaseControls,finishStage,updateCargo,dropCargo,equipCosmetic,medalCount,loadCampaign,saveCampaign,updateBoss,targetTicks,openCampaign,closeCampaign,
+get campaign(){return campaign},get cosmetics(){return COSMETICS},
 get parts(){return parts},
 get frame(){return frame},get weaponIndex(){return weaponIndex},set frame(v){frame=v},
 get spits(){return spits},
@@ -54,7 +55,7 @@ function canLand(level,x,startFeet,targetY){
  for(let f=0;f<90;f++){if(startFeet===targetY && f===8)t.touch.J=false;t.update();if(p.onGround && p.x+p.w>x*32 && Math.abs(p.y+p.h-targetY)<1){t.touch.R=false;t.touch.J=false;return true;}if(t.state!=='play')break;}
  t.touch.R=false;t.touch.J=false;return false;
 }
-function fixture(row){const grid=Array.from({length:14},()=>Array(50).fill(' '));for(let x=0;x<50;x++){grid[12][x]='#';grid[13][x]='#';}for(let x=15;x<26;x++){grid[12][x]=' ';grid[13][x]=' ';}for(let x=15;x<18;x++)grid[row][x]='=';return {grid,W:50,zs:[],bolts:[],props:[],info:{...t.buildLevel(0).info},i:0,flagX:-1};}
+function fixture(row){const grid=Array.from({length:14},()=>Array(50).fill(' '));for(let x=0;x<50;x++){grid[12][x]='#';grid[13][x]='#';}for(let x=15;x<26;x++){grid[12][x]=' ';grid[13][x]=' ';}for(let x=15;x<18;x++)grid[row][x]='=';return {grid,W:50,zs:[],bolts:[],props:[],info:{...t.buildLevel(0).info},i:0,flagX:-1,runTicks:0,cargo:{x:300,y:366,carried:false,delivered:false,lock:0}};}
 t.newGame(0);assert.equal(canLand(fixture(6),15,384,192),false,'old high platform must reproduce failure');
 t.newGame(0);assert.equal(canLand(fixture(9),15,384,288),true,'fixed entry must be reachable without powers or sprint');
 // Boots produce a higher apex, with identical held-jump inputs.
@@ -167,4 +168,68 @@ for(let i=0;i<100;i++){
 assert.ok(crossings>100);
 console.log('PASS: original jump failure reproduced; fixed normal jump lands; '+crossings+' simulated crossings, '+platforms+' platform tiles across 100 stages checked; six weapon patterns, 14 powers, 10 course mechanics, 100 distinct stage configurations, costs, persistence, pause and expiry checked.');
 
+// Cargo contracts and campaign medals are independent, idempotent and persisted.
+t.campaign.stages={};t.saveCampaign();
+t.newGame(0);t.L.runTicks=t.targetTicks()+1;const noCargoWallet=t.wallet;t.finishStage();
+assert.equal(t.campaign.stages[0].clear,true);assert.equal(t.campaign.stages[0].speed,false);assert.equal(t.campaign.stages[0].cargo,false);assert.equal(t.wallet,noCargoWallet);
+t.newGame(0);t.L.runTicks=600;t.L.cargo.carried=true;const deliveryWallet=t.wallet;t.finishStage();
+assert.equal(t.campaign.stages[0].speed,true);assert.equal(t.campaign.stages[0].cargo,true);assert.equal(t.campaign.stages[0].grade,'GOLD');assert.equal(t.wallet,deliveryWallet+25);assert.equal(t.medalCount(),3);
+t.finishStage();assert.equal(t.wallet,deliveryWallet+25,'cannot double reward in same attempt');
+t.newGame(0);t.L.runTicks=99999;t.L.cargo.carried=true;t.finishStage();assert.equal(t.wallet,deliveryWallet+25,'replay cannot farm delivery bonus');assert.equal(t.campaign.stages[0].grade,'GOLD','never overwrite a better rating');assert.equal(t.campaign.stages[0].ticks,600);
+t.newGame(1);t.L.runTicks=t.targetTicks()+20;t.L.cargo.carried=true;t.finishStage();assert.equal(t.campaign.stages[1].grade,'SILVER');assert.equal(t.campaign.stages[1].speed,false);
+assert.equal(t.campaign.stage,2);const restored=t.loadCampaign();assert.equal(restored.stage,2);assert.equal(restored.stages[0].ticks,600);assert.equal(restored.stages[1].cargo,true);
+assert.equal(t.equipCosmetic('courier'),true);assert.equal(t.equipCosmetic('royal'),false);assert.equal(t.equipCosmetic('not-real'),false);assert.equal(t.loadCampaign().equipped.outfit,'courier');
+// All reward tiers unlock on actual medal counts, without spending wallet or changing stats.
+const cosmeticWallet=t.wallet;t.campaign.stages={};for(let i=0;i<15;i++)t.campaign.stages[i]={clear:true,speed:true,cargo:true,ticks:500,grade:'GOLD'};
+for(const item of t.cosmetics)assert.equal(t.equipCosmetic(item.id),true,item.id);assert.equal(t.wallet,cosmeticWallet);
+t.newGame(10);assert.equal(t.p.health,4,'only existing boss armor affects health, not outfit');
+// Loading rejects invalid stages, scores, medal flags and locked cosmetic selections.
+store['cargoQuest2.campaign.v1']=JSON.stringify({version:1,stage:999,best:-1,stages:{0:{clear:'yes',speed:false,cargo:false,ticks:-5}},equipped:{outfit:'royal'}});
+const sanitized=t.loadCampaign();assert.equal(sanitized.stage,0);assert.equal(sanitized.best,0);assert.equal(sanitized.stages[0].clear,false);assert.equal(sanitized.stages[0].ticks,null);assert.equal(sanitized.equipped.outfit,'classic');
+store['cargoQuest2.campaign.v1']='broken json';assert.equal(t.loadCampaign().stage,0);t.saveCampaign();
+// Browser storage failures leave gameplay usable in-session.
+const setItem=sandbox.localStorage.setItem;sandbox.localStorage.setItem=()=>{throw Error('storage blocked')};t.newGame(0);t.L.cargo.carried=true;t.L.runTicks=100;t.finishStage();assert.equal(t.campaign.stages[0].clear,true);sandbox.localStorage.setItem=setItem;t.saveCampaign();
+// Cargo pickup, theft and recovery use a safe ground position; opening dispatch freezes the timer.
+cleanRun();Object.assign(t.L.cargo,{x:t.p.x+12,y:t.p.y+30});t.updateCargo();assert.equal(t.L.cargo.carried,true);
+const thief={};t.p.safeX=96;t.dropCargo(thief);assert.equal(t.L.cargo.carried,false);assert.equal(t.L.cargo.x,96);assert.equal(thief.flee,120);assert.equal(t.L.cargo.lock,60);
+t.updateCargo();assert.equal(t.L.cargo.carried,false,'theft cannot instantly recollect');for(let n=0;n<60;n++)t.updateCargo();assert.equal(t.L.cargo.carried,true);
+t.openCampaign();const dispatchTicks=t.L.runTicks,dispatchFrame=t.frame;for(let n=0;n<100;n++)t.update();assert.equal(t.L.runTicks,dispatchTicks);assert.equal(t.frame,dispatchFrame);t.closeCampaign();
+// Cargo placement and tactical variants exist across the campaign without altering pit platforms.
+const variants=new Set();let perched=0;
+for(let i=0;i<100;i++){
+ const l=t.buildLevel(i),x=Math.floor(l.cargo.x/32);assert.equal(l.grid[12][x],'#','cargo on street '+i);assert.equal(l.grid[11][x],' ','cargo not inside a solid '+i);
+ assert.equal(l.cargo.carried,false);assert.equal(l.runTicks,0);
+ for(const z of l.zs){variants.add(z.type);if(z.type==='thrower'){assert.notEqual(l.grid[8][Math.floor(z.x/32)],' ');perched++;}}
+}
+for(const kind of ['shield','thief','thrower'])assert.ok(variants.has(kind));assert.ok(perched>0);
+// Shield blocks the first frontal round, then visibly staggers; rear shots deal damage.
+function enemy(type){return {alive:true,active:true,dead:false,flash:0,x:155,y:324,w:26,h:60,vx:0,vy:0,hp:20,maxHp:20,speed:0,dir:-1,anim:0,type,pts:100,onGround:true,attack:1};}
+cleanRun();const guard=enemy('shield');t.L.zs=[guard];t.fire();t.update();assert.equal(guard.hp,20);assert.equal(guard.guardBreak,45);t.fire();t.update();assert.ok(guard.hp<20,'follow-up hits staggered shield');
+cleanRun();const rear=enemy('shield');rear.x=105;t.p.x=155;t.p.face=-1;t.L.zs=[rear];rear.onGround=false;rear.dir=-1;t.fire();t.update();assert.ok(rear.hp<20,'rear attack bypasses shield');
+cleanRun();const lobber=enemy('thrower');lobber.x=400;t.L.zs=[lobber];t.update();assert.ok(t.spits.length>0,'thrower emits a hostile projectile');
+cleanRun();const cargoThief=enemy('thief');cargoThief.x=t.p.x;cargoThief.y=t.p.y;cargoThief.speed=0;t.L.zs=[cargoThief];t.L.cargo.carried=true;t.update();assert.equal(t.L.cargo.carried,false,'thief collision drops cargo');
+// Lost cargo remains recoverable even when the last safe position is behind the camera.
+cleanRun();t.p.x=1200;t.p.safeX=96;t.L.cargo.carried=true;t.update();t.dropCargo({});assert.ok(t.L.cargo.x>=sandbox.__game.cam,'cargo is not behind the one-way camera');
+// Real flag and boss-reward collision paths award medals, not merely direct helper calls.
+cleanRun();t.campaign.stages={};t.p.x=t.L.flagX*32-28;t.L.cargo.carried=true;t.update();assert.equal(t.state,'clear');assert.equal(t.campaign.stages[0].cargo,true);assert.equal(t.L.recorded,true);
+cleanRun(4);t.campaign.stages={};t.L.cargo.carried=true;t.L.crate={x:t.p.x,y:324,w:32,h:32,onGround:true};t.update();assert.equal(t.state,'clear');assert.equal(t.campaign.stages[4].clear,true);assert.equal(t.campaign.stages[4].cargo,true);
+// Each region has a distinct signature, with a full second of harmless warning.
+const signatures=new Set();
+for(const stage of [4,9,14,19,24]){
+ cleanRun(stage);t.spawnBoss();const b=t.L.boss;b.mode='walk';b.signatureCd=0;b.onGround=true;
+ t.updateBoss();assert.equal(b.signatureWarning,60);assert.equal(t.spits.length,0);const health=t.p.health;
+ t.openShop();for(let n=0;n<90;n++)t.update();assert.equal(b.signatureWarning,60,'shopping freezes boss warning');t.closeShop();
+ for(let n=0;n<59;n++)t.updateBoss();assert.equal(b.signatureWarning,1);assert.equal(t.spits.length,0);assert.equal(t.p.health,health);
+ t.updateBoss();
+ const id=t.L.info.loc.id;signatures.add(id);
+ if(id==='nola')assert.ok(t.L.zs.length>=2,'voodoo summons');
+ if(id==='la')assert.equal(b.mode,'signatureDash');
+ if(id==='hou')assert.ok(t.spits.every(s=>s.wave));
+ if(id==='lej')assert.equal(t.spits.length,3);
+ if(id==='pi'){assert.equal(b.strikeTicks,24);assert.equal(b.targets.length,3);}
+ b.hp=b.maxHp*.3;b.signatureWarning=1;t.updateBoss();assert.equal(b.signatureCd,240,'enraged cadence is faster');
+ if(id==='pi')assert.equal(b.strikeTicks,35);
+}
+assert.equal(signatures.size,5);
+console.log('PASS: cargo recovery/delivery and reward idempotency, independent medals, save validation/reload/storage failure, all cosmetic tiers, dispatch pause, tactical enemies, and five warned/enraged boss signatures.');
 module.exports = { test: t };
