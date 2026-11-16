@@ -16,7 +16,15 @@ The renderer uses shared instanced geometry/materials, view-window culling, and 
 
 Collectibles are oval king cakes inspired by traditional Mardi Gras pastries: golden-brown rings with open centers, white icing drips, and alternating purple, green and gold sugar. Both 3D and 2D views, the HUD counter and supply-crate reward pops use the cake artwork. Pickup positions, magnet range, scoring, the 50-cake extra life and saved coin balances are unchanged. Storm-course lightning hazards are still hazards.
 
-Background buildings, cars, trees and lamps use a muted blue-grey material pass; scenery does not receive the bright gameplay edge markings. Foreground solids use warm amber bodies with dark frames and cream top lips. Cyan edges identify landing surfaces; red end caps mark pit lips. Steam, lightning and thorn areas have permanent striped footprints and posts, with distinct idle/warning/active colors. The legend is visible above the game. These shape/pattern cues supplement color, and the 2D fallback keeps matching edge/stripe cues. Geometry, hitboxes, hazard timing and saved coins are unchanged.
+Background buildings, cars, trees and lamps use a muted blue-grey material pass; scenery does not receive the bright gameplay edge markings. Foreground solids use warm amber bodies with dark frames and cream top lips. Cyan edges identify landing surfaces; red end caps mark pit lips. Steam, lightning and thorn areas have permanent striped footprints and posts, with distinct idle/warning/active colors. The legend is visible above the game. These shape/pattern cues supplement color, and the 2D fallback keeps matching edge/stripe cues. Collider readability and hazard timing are unchanged; longer course layouts are described below. Saved coins remain intact.
+
+## Safe-house Mardi Gras finale and longer courses
+
+Every completed campaign stage now auto-walks the player to the safe-house doorway before a three-second Mardi Gras welcome: purple/green/gold confetti, cheering neighbors, warm porch lights and the existing clear fanfare. Both render modes show a Creole-style weatherboard house, cream trim, shuttered windows, ironwork balcony, bead garlands, bunting and steps. The camera follows the final walk so the celebration stays visible. Boss reward collection opens the arena's right wall into an extended exit street and uses the same celebration. The final stage celebrates before the win screen.
+
+Normal courses grow from 150–259 tiles to 190–321 tiles (about 25% longer, depending on stage), with a protected 32-tile finish approach containing a two-step barricade, low pipe and brick hurdle. Random generation leaves a full segment buffer before that approach, avoiding cut-off pit platforms. Each added obstacle is tested at ordinary walking speed without powers. Timed street hazards and enemy spawns stay out of the added approach and final runway. Normal starting time rises from 300 to 380 game units; boss stages grow from 45 to 55 tiles with a post-fight exit street and a starting timer of 280 instead of 250. Boss fight geometry and signatures are unchanged.
+
+Stage medals, delivery rewards and speed records still commit at the original flag/reward checkpoint; walking to the house and celebrating do not add active run time or duplicate rewards. Daily Dispatch also celebrates before showing its already-recorded result; it never advances into campaign. Survival remains a wave arena with no stage-exit celebration. Confetti is decorative and bounded by the existing 400-particle limit; reduced-motion preference suppresses it while keeping the static welcome. Opening Dispatch or the store freezes the celebration like the rest of the simulation.
 
 ## Controls
 
@@ -35,7 +43,7 @@ Touch buttons use captured Pointer Events with per-button pointer ownership, so 
 
 Damaged zombies show remaining-health bars in both render modes; new enemy silhouettes and warning markers show their roles. Q/E cycle weapons forward/back and 1–9 select directly. Switching preserves cooldown and heat, so it cannot be used to bypass weapon recovery. Overheat shows an approximate cooling countdown. Active powers wrap into columns instead of extending down the entire playfield.
 
-Successful shots display a short hit-confirmation marker in both render modes, damage shows a brief border flash, and solid landings emit dust. 3D weapons now use the existing recoil value. Existing weapon damage is unchanged; the new grenade blast adds a small impact shake. Existing saved coins and course layouts are preserved.
+Successful shots display a short hit-confirmation marker in both render modes, damage shows a brief border flash, and solid landings emit dust. 3D weapons now use the existing recoil value. Existing weapon damage is unchanged; the new grenade blast adds a small impact shake. Existing saved coins remain intact; course extensions are described above.
 
 ## Cargo contracts, campaign and medals
 
@@ -171,3 +179,5 @@ Player bullets check the path from the player to the muzzle on their first tick,
 The audit suite exercises these edge cases, plus full 2D draw/HUD calls across all 100 stages and both extra modes using a stubbed canvas. These checks do not establish real-browser appearance, hardware performance or that no undiscovered issues remain.
 
 Expansion regressions cover grenade impact/fuse/idempotency and terrain occlusion, plating and piercing, ward consumption, Air Step limits, Focus heat/spread, Frost Pulse occlusion/pause, leaper warning/freeze, medic healing caps/self-exclusion/occlusion, later-wave rosters and all new 3D geometry paths. Real-browser appearance and device performance still need a deployable preview.
+
+Safe-house regressions additionally simulate all 100 campaign finishes (including boss wall opening and final victory), celebration-once timing, frozen speed time/rewards, particle bounds, reduced motion, overlay pause, Daily result return, all 240 new normal-course obstacle crossings, and safe-house/confetti geometry across every region. These are simulated checks, not real GPU or device verification.

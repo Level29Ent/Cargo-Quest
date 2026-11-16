@@ -9,8 +9,8 @@ function el(){return {set width(v){this._width=v;drawing.imageSmoothingEnabled=t
 const listeners={};
 const sandbox={console,Math,Set,Image:function(){},innerWidth:390,innerHeight:844,performance:{now:()=>0},requestAnimationFrame(){},setTimeout(){},addEventListener(name,fn){listeners[name]=fn;},document:{getElementById:id=>nodes[id]??=el(),createElement:()=>el(),createTextNode:text=>({textContent:text}),querySelectorAll:()=>[],addEventListener(name,fn){listeners[name]=fn;}},localStorage:{getItem:k=>store[k]??null,setItem:(k,v)=>store[k]=v}};
 sandbox.window=sandbox;
-src=src.replace('window.__game =',`window.test={buildLevel,moveBody,newGame,update,openShop,closeShop,purchasePower,earnCoins,addBolt,killZombie,hurtPlayer,fire,spawnBoss,SHOP_POWERS,WEAPONS,selectWeapon,grantPower,COURSES,fit,drawHUD,togglePause,releaseControls,finishStage,updateCargo,dropCargo,equipCosmetic,medalCount,loadCampaign,saveCampaign,updateBoss,targetTicks,openCampaign,closeCampaign,startDaily,startSurvival,dailyContract,finishMode,retryMode,spawnWave,updateSurvival,loadModeRecords,renderFieldGuide,modeStatus,drawScreens,startLevel,drawLevel,drawKingCake,makeZombie,detonate,clearShot,loop,
-get gameMode(){return gameMode},get activeRun(){return activeRun},get modeRecords(){return modeRecords},
+src=src.replace('window.__game =',`window.test={buildLevel,moveBody,newGame,update,openShop,closeShop,purchasePower,earnCoins,addBolt,killZombie,hurtPlayer,fire,spawnBoss,SHOP_POWERS,WEAPONS,selectWeapon,grantPower,COURSES,fit,drawHUD,togglePause,releaseControls,finishStage,updateCargo,dropCargo,equipCosmetic,medalCount,loadCampaign,saveCampaign,updateBoss,targetTicks,openCampaign,closeCampaign,startDaily,startSurvival,dailyContract,finishMode,retryMode,spawnWave,updateSurvival,loadModeRecords,renderFieldGuide,modeStatus,drawScreens,startLevel,drawLevel,drawKingCake,makeZombie,detonate,clearShot,startCelebration,updateClear,loop,
+get clearPhase(){return clearPhase},get gameMode(){return gameMode},get activeRun(){return activeRun},get modeRecords(){return modeRecords},
 get campaign(){return campaign},get cosmetics(){return COSMETICS},
 get parts(){return parts},
 get frame(){return frame},get weaponIndex(){return weaponIndex},set frame(v){frame=v},
@@ -256,7 +256,7 @@ t.addBolt(0,0);assert.equal(store['cargoQuest2.coins'],originalCoinSave);assert.
 t.L.runTicks=1000;t.L.cargo.carried=true;t.finishStage();assert.equal(t.state,'result');assert.equal(t.modeRecords.daily[daily.day].ticks,1000);assert.equal(t.modeRecords.daily[daily.day].cargo,true);
 const resultRecord=JSON.stringify(t.modeRecords);t.finishMode(true);assert.equal(JSON.stringify(t.modeRecords),resultRecord);t.drawScreens();assert.ok(hudText.includes('CARGO DELIVERED'));
 t.retryMode();assert.equal(t.activeRun.day,daily.day);assert.equal(t.state,'intro');t.L.runTicks=2000;t.L.cargo.carried=false;t.finishStage();assert.equal(t.modeRecords.daily[daily.day].ticks,1000);assert.equal(t.modeRecords.daily[daily.day].cargo,true);
-t.startDaily('2026-11-17');t.state='play';t.L.zs=[];t.L.elements=[];t.L.pickups=[];t.L.cargo.carried=true;t.p.x=t.L.flagX*32-28;t.update();assert.equal(t.state,'result','real daily flag completes without advancing into campaign');
+t.startDaily('2026-11-17');t.state='play';t.L.zs=[];t.L.elements=[];t.L.pickups=[];t.L.cargo.carried=true;t.p.x=t.L.flagX*32-28;t.update();assert.equal(t.state,'clear','daily first walks to the safe house');for(let n=0;n<900 && t.state==='clear';n++)t.update();assert.equal(t.state,'result','daily celebration returns to its result, never campaign');
 assert.equal(JSON.stringify(t.campaign),originalCampaign);assert.equal(t.wallet,originalWallet);
 // Daily failure, pause, retries and restart all keep campaign isolated.
 t.startDaily('2026-11-18');t.state='play';t.L.zs=[];t.p.health=1;t.p.inv=0;t.hurtPlayer(t.p.x+10);assert.equal(t.state,'dying');for(let f=0;f<160;f++)t.update();assert.equal(t.state,'result');assert.equal(t.modeRecords.daily['2026-11-18'],undefined);
@@ -323,7 +323,7 @@ audit('bullets stop at the nearest enemy, not roster order',()=>{
 });
 audit('daily cargo pickup at the flag uses the final moved position',()=>{
  t.startDaily('2027-10-02');t.state='play';t.L.zs=[];t.L.elements=[];t.p.x=t.L.flagX*32-29;t.p.y=324;t.p.vx=3.6;t.p.onGround=true;t.touch.R=true;
- t.L.cargo.x=t.p.x+12+31;t.L.cargo.y=354;t.update();assert.equal(t.state,'result');assert.equal(t.modeRecords.daily['2027-10-02'].cargo,true);t.releaseControls();
+ t.L.cargo.x=t.p.x+12+31;t.L.cargo.y=354;t.update();assert.equal(t.state,'clear');assert.equal(t.modeRecords.daily['2027-10-02'].cargo,true);t.releaseControls();
 });
 audit('a killing shot on the last arena enemy records its cleared wave immediately',()=>{
  t.startSurvival();t.state='play';t.spawnWave();const z=enemy('walker');Object.assign(z,{x:155,hp:1});t.L.zs=[z];t.p.x=96;
@@ -402,6 +402,50 @@ audit('grenade wall impacts and boss hits detonate once; blasts draw in fallback
 });
 audit('air reversals respond sooner without changing top speed',()=>{
  combatRoom();t.p.onGround=false;t.p.y=250;t.p.vx=2;t.touch.L=true;t.update();assert.ok(t.p.vx<=1.62,'stronger airborne direction reversal');t.touch.L=false;
+});
+audit('all longer courses have reachable added obstacles and protected exits',()=>{
+ for(let i=0;i<100;i++){
+  const l=t.buildLevel(i);
+  if(l.info.isBoss){assert.equal(l.W,55);assert.equal(l.exitX,48);assert.equal(l.grid[11][44],'H');continue;}
+  const d=i/99;assert.ok(l.W>=190+Math.floor(d*112));assert.ok(l.W<=209+Math.floor(d*112));
+  const a=l.W-52;
+  assert.equal(l.grid[10][a+3],'H');assert.equal(l.grid[10][a+12],'p');assert.equal(l.grid[10][a+23],'B');
+  assert.ok(l.elements.every(e=>e.x+e.w<=(l.W-52)*32),'no timed hazards in the added finish approach');
+  for(let x=l.flagX-6;x<l.W;x++){assert.equal(l.grid[12][x],'#');for(let y=0;y<11;y++)assert.equal(l.grid[y][x],' ');}
+  for(const [x,width] of [[a+2,4],[a+12,2],[a+23,2]]){
+   t.newGame(0);t.L=l;l.flagX=-1;l.zs=[];l.bolts=[];t.state='play';
+   Object.assign(t.p,{x:x*32-65,y:324,vx:3.6,vy:0,onGround:true,coyote:8,inv:9999});
+   t.touch.R=true;t.touch.J=true;t.jump();let crossed=false;
+   for(let f=0;f<90;f++){if(f===12)t.touch.J=false;t.update();if(t.p.x>(x+width)*32 && t.p.onGround){crossed=true;break;}}
+   t.releaseControls();assert.equal(crossed,true,'unpowered jump clears authored obstacle '+x+' in stage '+(i+1));
+  }
+ }
+});
+audit('every campaign stage celebrates once at its safe-house doorway, including bosses',()=>{
+ for(let i=0;i<100;i++){
+  t.newGame(i);t.state='play';t.L.zs=[];t.L.elements=[];t.L.pickups=[];t.L.cargo.carried=true;t.p.inv=9999;
+  if(t.L.info.isBoss){
+   t.L.crate={x:t.p.x,y:t.p.y,w:32,h:32,vy:0,onGround:true};
+   t.update();assert.equal(t.L.grid[11][44],' ','boss exit wall opens only after reward');
+  }else{t.p.x=t.L.flagX*32-28;t.p.y=324;t.p.onGround=true;t.update();}
+  assert.equal(t.state,'clear');assert.equal(t.L.celebration,undefined,'flag/reward itself does not start the party');
+  for(let n=0;n<800 && !t.L.celebration;n++)t.update();
+  assert.ok(t.L.celebration,'stage '+(i+1)+' reaches the party');assert.equal(t.clearPhase,4);
+  assert.equal(t.p.x+t.p.w/2,t.L.exitX*32+100,'party starts at the visible doorway');
+  assert.equal(t.p.y+t.p.h,384);assert.equal(t.p.vx,0);assert.ok(t.parts.some(p=>p.kind==='confetti'));
+  const ticks=t.L.runTicks,wallet=t.wallet,count=t.parts.length;
+  t.startCelebration();assert.equal(t.parts.length,count,'no duplicate celebration emission');
+  for(let n=0;n<179;n++)t.update();assert.equal(t.clearPhase,4,'full three-second celebration');
+  assert.equal(t.L.runTicks,ticks,'celebration does not add to speed time');assert.equal(t.wallet,wallet,'party cannot duplicate rewards');
+  assert.ok(t.parts.length<=400,'bounded particle count');const particles=JSON.stringify(t.parts);t.drawLevel();t.drawHUD();t.drawScreens();assert.equal(JSON.stringify(t.parts),particles,'drawing confetti does not advance physics or mutate particles');
+  t.update();assert.equal(t.clearPhase,2,'time tally starts only after the party');
+ }
+});
+audit('celebration respects reduced motion and campaign overlay pause, then final stage wins',()=>{
+ cleanRun(99);sandbox.matchMedia=()=>({matches:true});t.startCelebration();assert.ok(!t.parts.some(p=>p.kind==='confetti'));
+ t.state='clear';const partyTicks=t.L.celebration.ticks;t.openCampaign();for(let i=0;i<30;i++)t.update();assert.equal(t.L.celebration.ticks,partyTicks);t.closeCampaign();delete sandbox.matchMedia;
+ for(let n=0;n<600 && t.state==='clear';n++)t.update();assert.equal(t.state,'win','last level reaches win rather than generating stage 101');
+ t.newGame(0);assert.equal(t.L.celebration,undefined,'retries/new levels reset party');
 });
 if(auditFailures.length)throw Error('AUDIT FAILURES\n'+auditFailures.join('\n'));
 module.exports = { test: t };

@@ -68,6 +68,17 @@ for(const type of ['leaper','plated','medic']){
   assert.ok(lastScene.children.filter(m=>m.isInstancedMesh&&m.count>0).length<100);
  }
 }
+// Safe houses and parade confetti render in all regions, including boss exits.
+for(const stage of [0,4,5,9,10,14,15,19,20,24,99]){
+ test.newGame(stage);test.L.celebration={ticks:100};const x=test.L.exitX*32;
+ const game={L:test.L,cam:Math.max(0,x-500),frame:200,player:test.p,effects:{},weapon:test.WEAPONS[0],flagY:64,bullets:[],spits:[],parts:[{kind:'confetti',x:x+100,y:220,c:'#9a45d2',spin:1,t:60}],state:'clear'};
+ const before=JSON.stringify(test.L.grid);world.window.__game=game;view.render(game);assert.equal(JSON.stringify(test.L.grid),before);
+ const meshes=lastScene.children.filter(m=>m.isInstancedMesh&&m.count>0);
+ for(const color of ['4a2864','f8dfaa','9a45d2','30cb76','ffd25d'])assert.ok(meshes.some(m=>m.material.color.getHexString()===color),'decorated safe-house palette '+color);
+ assert.ok(meshes.some(m=>m.userData.readabilityRole==='cue'&&m.material.color.getHexString()==='9a45d2'),'confetti visible');
+ for(const mesh of meshes)assert.ok(mesh.instanceMatrix.array.subarray(0,mesh.count*16).every(Number.isFinite));
+ assert.ok(meshes.length<100,'safe-house draw calls stay bounded');
+}
 // Extra modes share the real renderer, including the closed arena at high wave counts.
 for(const wave of [1,4,40]){
  test.startSurvival();test.activeRun.wave=wave-1;test.spawnWave();

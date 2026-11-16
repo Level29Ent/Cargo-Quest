@@ -201,6 +201,39 @@ try {
       if(boss)shape('cone',x,feet+h+8,0,width*.9,20,20,'gold');
     }
   }
+  function safeHouse(ex,party){
+    // Raised Creole porch, weatherboard facade, shutters and ironwork balcony.
+    box(ex+100,146,-45,200,164,65,'#4a2864');
+    for(let y=72;y<224;y+=12)box(ex+100,y,-10,200,2,3,'#694583');
+    box(ex+100,238,-40,218,12,80,'#f8dfaa');box(ex+100,151,0,216,7,95,'#f8dfaa');
+    box(ex+100,69,12,218,9,100,'#dfc797');
+    for(const dx of [36,164]){
+      box(ex+dx,199,-8,33,42,4,'#ffdc83',0,'glow');
+      for(const side of [-1,1])box(ex+dx+side*23,199,-4,8,46,5,'#173b33');
+      box(ex+dx,199,-3,3,42,3,'#f8dfaa');box(ex+dx,199,-2,33,3,3,'#f8dfaa');
+    }
+    box(ex+100,104,-7,50,80,5,'#152b28');
+    box(ex+100,102,-3,40,76,4,party?'#ffe3a0':'#ceaa57',0,party?'glow':'matte');
+    box(ex+100,110,0,28,43,3,'#40335a');orb(ex+115,96,2,3,3,3,'gold');
+    for(const dx of [4,61,139,196])box(ex+dx,109,22,6,90,6,'#f8dfaa');
+    for(const y of [154,173])box(ex+100,y,36,214,3,3,'#15212a');
+    for(let dx=0;dx<=200;dx+=12){box(ex+dx,164,36,2,20,2,'#15212a');orb(ex+dx+6,163,36,6,7,2,'#15212a');}
+    const colors=['#9a45d2','#30cb76','#ffd25d'];
+    for(let k=0;k<12;k++)shape('cone',ex+k*18,168,40,16,15,2,colors[k%3],Math.PI);
+    for(let k=0;k<31;k++)orb(ex+k*6.5,156-Math.sin(k/30*Math.PI)*8,27,4,4,4,colors[k%3]);
+    for(const dx of [64,136]){box(ex+dx,129,4,10,18,8,'#162e29');box(ex+dx,129,9,6,11,3,'#ffe3a0',0,'glow');}
+    box(ex+100,65,40,72,4,24,'#dfc797');
+    // Purple/green/gold sign above the door, kept free of porch supports.
+    box(ex+100,214,0,72,18,5,'green');box(ex+100,214,4,66,12,2,'purple');
+    for(const [dx,i] of [[-20,0],[220,1]]){
+      orb(ex+dx,92,18,16,25,14,colors[i]);orb(ex+dx,113,18,13,13,12,'skin');
+      for(const side of [-1,1]){
+        limb(ex+dx+side*5,99,ex+dx+side*14,party?119:86,18,4,colors[i]);
+        box(ex+dx+side*4,76,18,5,15,5,'dark');
+      }
+      shape('cone',ex+dx,126,18,18,16,14,colors[(i+2)%3]);
+    }
+  }
   let previousWidth=0, previousHeight=0, previousRatio=0;
   function fit(){
     canvas.style.width=overlay.style.width;canvas.style.height=overlay.style.height;
@@ -364,8 +397,8 @@ try {
       box(L.flagX*32+15,224,0,4,288,4,'silver');
       box(L.flagX*32-7,448-game.flagY-14,0,40,28,4,'purple');
       box(L.flagX*32+15,385,0,12,12,12,'gold');
-      if(L.exitX*32<cam+1000){box(L.exitX*32+80,124,-30,160,120,80,'rock');box(L.exitX*32+80,164,13,80,18,4,'green');}
     }
+    if(L.exitX>0 && (L.flagX>0 || L.info.isBoss) && L.exitX*32>cam-250 && L.exitX*32<cam+950)safeHouse(L.exitX*32,!!L.celebration);
     for(const z of L.zs)if(z.alive&&z.active&&z.x>cam-80&&z.x<cam+880)person(z,false);
     if(L.boss)person(L.boss,false,true);
     if(L.crate)box(L.crate.x+16,448-L.crate.y-16,0,32,32,32,'gold');
@@ -375,6 +408,7 @@ try {
     }
     for(const shot of game.spits)orb(shot.x,448-shot.y,4,12,12,12,'green','glow');
     for(const p of game.parts.slice(-100)){
+      if(p.kind==='confetti'){box(p.x,448-p.y,30,4,3,1,p.c,p.spin,'cue');continue;}
       if(p.kind==='boltpop'){kingCake(p.x,448-p.y);continue;}
       if(p.kind==='blast'||p.kind==='frostpulse'){
         const r=p.r*(1-p.t/(p.kind==='blast'?16:20));
