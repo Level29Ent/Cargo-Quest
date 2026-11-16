@@ -10,7 +10,7 @@ The HUD is branded **CARGO QUEST** and its backing buffer tracks the actual disp
 
 The enhanced renderer uses smooth low-poly sphere/cylinder/cone characters, an animated three-point jester cap, articulated limbs, detailed weapon models, layered skyline silhouettes, balcony railings, street furniture, generated asphalt/brick textures, emissive tracers and contact-shadow grounding cues. A procedural gradient sky and warm/cool lighting are tone-mapped with ACES. No external art downloads, full-screen bloom pass, or real-time shadow maps are required.
 
-The renderer uses shared instanced geometry/materials, view-window culling, and native-density output up to 2× with a three-million-pixel budget shared in policy by the 3D and HUD canvases. It defaults to 3D on WebGL2-capable browsers. The 3D/2D button switches rendering without restarting gameplay. If WebGL initialization or its context fails, gameplay falls back to the original 2D renderer. Real device performance still depends on GPU/browser support.
+The renderer uses shared instanced geometry/materials, view-window culling, and native-density output up to 2× with a three-million-pixel budget shared in policy by the 3D and HUD canvases. It defaults to 3D on WebGL2-capable browsers. The 3D/2D button switches rendering without restarting gameplay. If WebGL initialization or its context fails, gameplay falls back to the original 2D renderer. Real device performance still depends on GPU/browser support. 
 
 ## Visual readability
 
