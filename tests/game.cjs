@@ -4,12 +4,12 @@ const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
 assert.match(html,/canvas\{[^}]*image-rendering:crisp-edges;image-rendering:pixelated;/,'both canvas scaling CSS fallbacks are present');
 let src=html.match(/<script>([\s\S]*?)<\/script>/)[1];
 const store={};const nodes={};const hudText=[];
-const drawing=new Proxy({setTransform(...args){this.transform=args;},fillText(text){hudText.push(text);}}, {get(target,key){return key in target?target[key]:()=>{};}});
-function el(){return {set width(v){this._width=v;drawing.imageSmoothingEnabled=true;},get width(){return this._width},set height(v){this._height=v;drawing.imageSmoothingEnabled=true;},get height(){return this._height},style:{},classList:{add(){},remove(){},toggle(){}},events:{},addEventListener(name,fn){this.events[name]=fn;},setPointerCapture(){},getContext(){return drawing},replaceChildren(){},append(){},setAttribute(){},focus(){},hidden:true};}
+const drawing=new Proxy({createLinearGradient(){return {addColorStop(){}}},createRadialGradient(){return {addColorStop(){}}},measureText(text){return {width:String(text).length*8}},setTransform(...args){this.transform=args;},fillText(text){hudText.push(text);}}, {get(target,key){return key in target?target[key]:()=>{};}});
+function el(){return {set width(v){this._width=v;drawing.imageSmoothingEnabled=true;},get width(){return this._width},set height(v){this._height=v;drawing.imageSmoothingEnabled=true;},get height(){return this._height},style:{},classList:{add(){},remove(){},toggle(){}},events:{},addEventListener(name,fn){const prev=this.events[name];this.events[name]=prev?e=>{prev(e);fn(e);}:fn;},setPointerCapture(){},getContext(){return drawing},replaceChildren(){},append(){},setAttribute(){},focus(){sandbox.document.activeElement=this;},hidden:true};}
 const listeners={};
 const sandbox={console,Math,Set,Image:function(){},innerWidth:390,innerHeight:844,performance:{now:()=>0},requestAnimationFrame(){},setTimeout(){},addEventListener(name,fn){listeners[name]=fn;},document:{getElementById:id=>nodes[id]??=el(),createElement:()=>el(),createTextNode:text=>({textContent:text}),querySelectorAll:()=>[],addEventListener(name,fn){listeners[name]=fn;}},localStorage:{getItem:k=>store[k]??null,setItem:(k,v)=>store[k]=v}};
 sandbox.window=sandbox;
-src=src.replace('window.__game =',`window.test={buildLevel,moveBody,newGame,update,openShop,closeShop,purchasePower,earnCoins,addBolt,killZombie,hurtPlayer,fire,spawnBoss,SHOP_POWERS,WEAPONS,selectWeapon,grantPower,COURSES,fit,drawHUD,togglePause,releaseControls,finishStage,updateCargo,dropCargo,equipCosmetic,medalCount,loadCampaign,saveCampaign,updateBoss,targetTicks,openCampaign,closeCampaign,startDaily,startSurvival,dailyContract,finishMode,retryMode,spawnWave,updateSurvival,loadModeRecords,renderFieldGuide,modeStatus,drawScreens,
+src=src.replace('window.__game =',`window.test={buildLevel,moveBody,newGame,update,openShop,closeShop,purchasePower,earnCoins,addBolt,killZombie,hurtPlayer,fire,spawnBoss,SHOP_POWERS,WEAPONS,selectWeapon,grantPower,COURSES,fit,drawHUD,togglePause,releaseControls,finishStage,updateCargo,dropCargo,equipCosmetic,medalCount,loadCampaign,saveCampaign,updateBoss,targetTicks,openCampaign,closeCampaign,startDaily,startSurvival,dailyContract,finishMode,retryMode,spawnWave,updateSurvival,loadModeRecords,renderFieldGuide,modeStatus,drawScreens,startLevel,drawLevel,loop,
 get gameMode(){return gameMode},get activeRun(){return activeRun},get modeRecords(){return modeRecords},
 get campaign(){return campaign},get cosmetics(){return COSMETICS},
 get parts(){return parts},
@@ -275,4 +275,75 @@ const saveMode=sandbox.localStorage.setItem;sandbox.localStorage.setItem=()=>{th
 t.newGame(0);t.state='play';t.selectWeapon(5);assert.equal(t.gameMode,'campaign');assert.equal(t.weaponIndex,5);t.earnCoins(1);assert.equal(t.wallet,originalWallet+1);t.openShop();assert.equal(nodes.shop.hidden,false);t.closeShop();
 t.renderFieldGuide();
 console.log('PASS: daily routes/loadout/retry/death/results, isolated saves and economy, capped survival waves/healing/coolant/pause/records, bounded history and malformed/blocked storage.');
+// Audit regressions: exercise actual update and input boundaries, not only helpers.
+const auditFailures=[];
+function audit(name,fn){try{fn();console.log('PASS audit: '+name);}catch(e){auditFailures.push(name+': '+e.message);}}
+audit('fatal damage cannot become a campaign clear',()=>{
+ cleanRun();t.campaign.stages={};t.p.x=t.L.flagX*32-28;t.p.health=1;t.p.inv=0;
+ const z=enemy('walker');Object.assign(z,{x:t.p.x,y:t.p.y,speed:0});t.L.zs=[z];t.update();
+ assert.equal(t.state,'dying');assert.equal(t.campaign.stages[0],undefined);
+});
+audit('fatal damage cannot become a daily delivery',()=>{
+ t.startDaily('2026-10-01');t.state='play';t.L.elements=[];t.p.x=t.L.flagX*32-28;t.p.y=324;t.p.onGround=true;t.p.health=1;t.p.inv=0;t.L.cargo.carried=true;
+ const z=enemy('walker');Object.assign(z,{x:t.p.x,y:t.p.y,speed:0});t.L.zs=[z];t.update();
+ assert.equal(t.state,'dying');assert.equal(t.modeRecords.daily['2026-10-01'],undefined);
+});
+audit('fatal damage cannot be healed by the boss reward',()=>{
+ cleanRun(4);t.campaign.stages={};t.p.health=1;t.p.inv=0;t.L.crate={x:t.p.x,y:324,w:32,h:32,onGround:true};
+ t.spits.push({x:t.p.x+12,y:350,vx:0,vy:0,t:20});t.update();assert.equal(t.state,'dying');assert.equal(t.campaign.stages[4],undefined);
+});
+audit('paused DOM button activation never resumes or shoots the game',()=>{
+ cleanRun();t.togglePause();const button={tagName:'BUTTON',closest:()=>({})};
+ listeners.keydown({key:'Enter',target:button,preventDefault(){},repeat:false});assert.equal(t.state,'pause');
+ listeners.keydown({key:' ',target:button,preventDefault(){},repeat:false});assert.ok(!t.keys[' ']);
+});
+audit('mode restart preserves the first survival controls',()=>{
+ t.startSurvival();t.state='play';listeners.keydown({key:'r',preventDefault(){},repeat:false});assert.equal(t.gameMode,'survival');assert.equal(t.activeRun.wave,0);assert.equal(t.state,'intro');
+});
+audit('new campaign starts reset stale hazard phases',()=>{
+ cleanRun(2);t.frame=500;t.newGame(2);const firstFrame=t.frame;t.frame=9999;t.newGame(2);assert.equal(t.frame,firstFrame);
+});
+audit('piercing shots hit each boss only once',()=>{
+ cleanRun(4);t.spawnBoss();const b=t.L.boss;Object.assign(b,{x:170,y:284,mode:'spit',timer:500,speed:0});t.p.x=96;t.selectWeapon(2);t.fire();
+ t.bullets[0].x=171;t.bullets[0].originX=171;t.bullets[0].vx=1;const hp=b.hp;for(let n=0;n<3;n++)t.update();assert.equal(hp-b.hp,5);
+});
+audit('bullets stop at the nearest enemy, not roster order',()=>{
+ cleanRun();const far=enemy('walker'),near=enemy('walker');Object.assign(far,{x:160,w:26,speed:0});Object.assign(near,{x:150,w:26,speed:0});t.L.zs=[far,near];
+ t.fire();t.bullets[0].x=151;t.bullets[0].originX=151;t.bullets[0].vx=14;t.update();assert.ok(near.hp<20);assert.equal(far.hp,20);
+});
+audit('daily cargo pickup at the flag uses the final moved position',()=>{
+ t.startDaily('2027-10-02');t.state='play';t.L.zs=[];t.L.elements=[];t.p.x=t.L.flagX*32-29;t.p.y=324;t.p.vx=3.6;t.p.onGround=true;t.touch.R=true;
+ t.L.cargo.x=t.p.x+12+31;t.L.cargo.y=354;t.update();assert.equal(t.state,'result');assert.equal(t.modeRecords.daily['2027-10-02'].cargo,true);t.releaseControls();
+});
+audit('a killing shot on the last arena enemy records its cleared wave immediately',()=>{
+ t.startSurvival();t.state='play';t.spawnWave();const z=enemy('walker');Object.assign(z,{x:155,hp:1});t.L.zs=[z];t.p.x=96;
+ t.fire();t.update();assert.equal(z.dead,true);assert.equal(t.activeRun.completed,1);assert.equal(t.activeRun.breakTicks,120);
+});
+audit('point-blank shots hit the enemy between player and gun muzzle',()=>{
+ cleanRun();const z=enemy('walker');z.x=t.p.x+t.p.w+4;t.L.zs=[z];t.fire();t.update();assert.ok(z.hp<20);
+});
+audit('shots cannot be born beyond a wall at point-blank range',()=>{
+ cleanRun();t.L.grid[10][4]='H';t.L.grid[11][4]='H';const z=enemy('walker');z.x=165;t.L.zs=[z];t.fire();t.update();assert.equal(z.hp,20);assert.equal(t.bullets.length,0);
+});
+audit('full 2D draw remains callable for all generated stages and new modes',()=>{
+ for(let i=0;i<100;i++){t.newGame(i);t.state='play';t.drawLevel();t.drawHUD();}
+ t.startDaily('2027-11-16');t.state='play';t.drawLevel();t.drawHUD();t.startSurvival();t.state='play';t.spawnWave();t.drawLevel();t.drawHUD();
+});
+audit('pointer HUD clicks restore jump focus without double toggling pause',()=>{
+ cleanRun();nodes.bPause.events.click({detail:1});assert.equal(t.state,'pause');assert.equal(sandbox.document.activeElement,nodes.c);
+ nodes.bPause.events.click({detail:1});assert.equal(t.state,'play');assert.equal(sandbox.document.activeElement,nodes.c);
+ nodes.bWeapon.events.click({detail:1});assert.equal(t.weaponIndex,1);assert.equal(sandbox.document.activeElement,nodes.c);
+});
+audit('shots retain collision on their final lifetime tick',()=>{
+ cleanRun();const z=enemy('walker');Object.assign(z,{x:155,speed:0});t.L.zs=[z];t.fire();t.bullets[0].life=1;t.update();assert.ok(z.hp<20);assert.equal(t.bullets.length,0);
+});
+audit('fatal street hazard wins over a healing pickup and finish flag',()=>{
+ cleanRun(7);t.p.x=t.L.flagX*32-28;t.p.health=1;t.p.inv=0;t.L.elements=[{x:t.p.x,w:64,kind:'thorn',phase:0}];t.L.pickups=[{x:t.p.x+12,y:354,id:'heal',got:false}];
+ t.update();assert.equal(t.state,'dying');assert.equal(t.p.health,0);assert.equal(t.L.pickups[0].got,false);
+});
+audit('left-facing close shots and fast shots use the swept path',()=>{
+ cleanRun();t.p.x=200;t.p.face=-1;const z=enemy('walker');Object.assign(z,{x:165,speed:0});t.L.zs=[z];t.fire();t.update();assert.ok(z.hp<20);
+ cleanRun();const fastTarget=enemy('walker');Object.assign(fastTarget,{x:200,w:12,speed:0});t.L.zs=[fastTarget];t.fire();t.bullets[0].vx=150;t.update();assert.ok(fastTarget.hp<20,'fast projectile does not tunnel through a narrow target');
+});
+if(auditFailures.length)throw Error('AUDIT FAILURES\n'+auditFailures.join('\n'));
 module.exports = { test: t };

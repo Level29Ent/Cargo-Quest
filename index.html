@@ -72,7 +72,7 @@
 <body>
 <div id="wrap">
   <canvas id="world3d" aria-label="3D game world"></canvas>
-  <canvas id="c" width="800" height="448" aria-label="Cargo Quest: Zombie Streets platformer game"></canvas>
+  <canvas id="c" tabindex="0" width="800" height="448" aria-label="Cargo Quest: Zombie Streets platformer game"></canvas>
   <button id="bPause" aria-label="Pause or resume game">PAUSE [P]</button>
   <button id="bS" aria-label="Toggle music and sound">♪ ON</button>
   <button id="bView" aria-label="Toggle 3D rendering">3D · ON</button>
@@ -462,6 +462,8 @@ addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
   if(campaignOpen){if(k==='escape')closeCampaign();return;}
   if (shopOpen){ if(k==='escape') closeShop(); return; }
+  // Let native controls own activation keys; Enter/Space must not also affect gameplay.
+  if((k==='enter' || k===' ') && e.target?.closest?.('button, summary, input, select, textarea, a, [contenteditable="true"]'))return;
   if(k==='c' && !e.repeat){openCampaign();return;}
   if (k==='b'){ openShop(); return; }
   if (k==='q' && !e.repeat) cycleWeapon();
@@ -470,7 +472,7 @@ addEventListener('keydown', e => {
   if (!keys[k] && (k===' '||k==='w'||k==='arrowup')) jumpPressed = true;
   keys[k] = true;
   ensureAudio();
-  if (k==='enter') onEnter();
+  if (k==='enter' && !e.repeat) onEnter();
   if (state==='title' || state==='gameover'){
     if (k==='arrowleft' || k==='a') pickStart(-1);
     if (k==='arrowright' || k==='d') pickStart(1);
@@ -508,6 +510,10 @@ addEventListener('blur',suspendGame);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)suspendGame();});
 document.getElementById('bS').addEventListener('click', e => { e.stopPropagation(); ensureAudio(); setSoundMode(soundMode + 1); });
 bindBtn('bL','L'); bindBtn('bR','R'); bindBtn('bJ','J'); bindBtn('bF','F');
+// Pointer-operated HUD controls return keyboard movement/jump focus to the game.
+for(const id of ['bPause','bS','bWeapon','bView'])document.getElementById(id).addEventListener('click',e=>{
+  if(e.detail>0)cv.focus({preventScroll:true});
+});
 cv.addEventListener('pointerdown', e => {
   ensureAudio();
   if (state==='title'||state==='gameover'||state==='win'||state==='pause'||state==='result') { onEnter(); return; }
@@ -897,7 +903,7 @@ document.getElementById('campaignClose').addEventListener('click',closeCampaign)
 document.getElementById('continueCampaign').addEventListener('click',()=>{closeCampaign();newGame(campaign.stage);});
 document.getElementById('campaign').addEventListener('keydown',e=>{
   if(e.key!=='Tab')return;
-  const buttons=[...document.querySelectorAll('#campaign button:not(:disabled)')],first=buttons[0],last=buttons[buttons.length-1];
+  const buttons=[...document.querySelectorAll('#campaign button:not(:disabled), #campaign summary')],first=buttons[0],last=buttons[buttons.length-1];
   if(e.shiftKey && document.activeElement===first){e.preventDefault();last.focus();}
   else if(!e.shiftKey && document.activeElement===last){e.preventDefault();first.focus();}
 });
@@ -1017,7 +1023,7 @@ function newGame(from,mode='campaign'){
   if(gameMode==='campaign'){campaign.stage=from;saveCampaign();}startLevel(from);refreshWallet();
 }
 function startLevel(i){
-  releaseControls();
+  releaseControls();frame=0;
   levelIdx = i; L = buildLevel(i);
   player = { x:3*T, y:GROUND-60-2, w:24, h:60, vx:0, vy:0, onGround:false, face:1, anim:0, coyote:0, buf:0, inv:60,
              health:maxHealth(), heat:0, overheat:false, fireCd:0, flash:0, dblUsed:false, recoil:0, hitMark:0, hitX:0, hitY:0, hurtFlash:0 };
@@ -1123,7 +1129,7 @@ function fire(){
   const mx=p.x+p.w/2+p.face*38, my=p.y+29;
   for(let k=0;k<n;k++){
     const spread=n===1?0:(k-(n-1)/2)*(weapon.name==='Flamer'?.65:1.1);
-    bullets.push({x:mx,y:my,vx:p.face*weapon.speed,vy:spread,life:weapon.life,
+    bullets.push({x:mx,y:my,originX:p.x+p.w/2+p.face*(p.w/2+1),originY:my,vx:p.face*weapon.speed,vy:spread,life:weapon.life,
       dmg:bulletDmg()*weapon.damage*(effects.damage>0?2:1),pierce:(weapon.pierce||0)+(up.ap>0?2:0),
       slow:weapon.slow||effects.frost>0,color:weapon.color,hit:new Set()});
   }
@@ -1265,7 +1271,7 @@ function update(){
   if (state==='clear'){ updateClear(); updateFx(); return; }
 
   const p = player;
-  L.runTicks++;if(gameMode==='survival')updateSurvival();else updateCargo();
+  L.runTicks++;if(gameMode==='survival' && activeRun.breakTicks>0)updateSurvival();
   for(const id in effects) if(effects[id]>0) effects[id]--;
   if(gameMode!=='survival')timeAcc += 1/60;
   if (timeAcc >= .4){ timeAcc -= .4; time--; if (time===100 && !hurried){ hurried = true; snd('hurry'); } if (time<=0){ time=0; killPlayer(); return; } }
@@ -1326,6 +1332,8 @@ function update(){
     if(region.kind==='belt' && !p.hitWall){const oldV=p.vx;p.vx=1;moveBody(p);p.vx=oldV;}
     if(region.kind==='thorn' || (['steam','storm'].includes(region.kind) && phase>=180 && phase<215))hurtPlayer(region.x+region.w/2);
   }
+  if(state!=='play'){updateFx();return;}
+  if(gameMode!=='survival')updateCargo();
   for(const pickup of L.pickups||[])if(!pickup.got && Math.abs(p.x+p.w/2-pickup.x)<28 && Math.abs(p.y+p.h/2-pickup.y)<48){
     pickup.got=true;grantPower(pickup.id);snd('power');popups.push({x:pickup.x,y:pickup.y,t:80,txt:SHOP_POWERS.find(item=>item.id===pickup.id).name});
   }
@@ -1383,35 +1391,44 @@ function update(){
     }
   }
 
-  // bullets
+  if(state!=='play'){updateFx();return;}
+  // Substep fast projectiles and visit frontmost targets first, not spawn-array order.
   for (const b of bullets){
-    b.x += b.vx; b.y += b.vy; b.life--;
-    const tx = Math.floor(b.x / T), ty = Math.floor(b.y / T);
-    if (solidAt(tx, ty)){
-      if (tileAt(tx,ty)==='B'){ breakBrick(tx, ty); addScore(50); }
-      b.life = 0; parts.push({kind:'spark', x:b.x, y:b.y, t:8});
-      continue;
-    }
-    if (b.x < cam - 20 || b.x > cam + VW + 20) { b.life = 0; continue; }
-    for (const z of L.zs){
-      if (!z.alive || z.dead || !z.active || b.hit.has(z)) continue;
-      if (b.x > z.x && b.x < z.x + z.w && b.y > z.y && b.y < z.y + z.h){
-        if(z.type==='shield' && !z.guardBreak && Math.sign(b.vx)===-z.dir){
-          z.guardBreak=45;b.life=0;parts.push({kind:'spark',x:b.x,y:b.y,t:8});snd('bump');break;
+    const targets=[...L.zs].sort((a,c)=>b.vx>=0?a.x-c.x:(c.x+c.w)-(a.x+a.w));
+    const endX=b.x+b.vx,endY=b.y+b.vy;
+    if(b.originX!==undefined){b.x=b.originX;b.y=b.originY;delete b.originX;delete b.originY;}
+    const dx=endX-b.x,dy=endY-b.y;
+    const steps=Math.max(1,Math.ceil(Math.max(Math.abs(dx),Math.abs(dy))/8));
+    for(let step=0;step<steps && b.life>0;step++){
+      b.x += dx/steps; b.y += dy/steps;
+      const tx = Math.floor(b.x / T), ty = Math.floor(b.y / T);
+      if (solidAt(tx, ty)){
+        if (tileAt(tx,ty)==='B'){ breakBrick(tx, ty); addScore(50); }
+        b.life = 0; parts.push({kind:'spark', x:b.x, y:b.y, t:8});
+        continue;
+      }
+      if (b.x < cam - 20 || b.x > cam + VW + 20) { b.life = 0; continue; }
+      for (const z of targets){
+        if (!z.alive || z.dead || !z.active || b.hit.has(z)) continue;
+        if (b.x > z.x && b.x < z.x + z.w && b.y > z.y && b.y < z.y + z.h){
+          if(z.type==='shield' && !z.guardBreak && Math.sign(b.vx)===-z.dir){
+            z.guardBreak=45;b.life=0;parts.push({kind:'spark',x:b.x,y:b.y,t:8});snd('bump');break;
+          }
+          registerHit(b.x,b.y);
+          if(b.slow)z.slow=180;
+          z.hp -= b.dmg; z.flash = 4; b.hit.add(z); z.x += Math.sign(b.vx) * (z.type==='brute' ? .8 : 2.5);
+          gore(b.x, b.y, 2);
+          if (z.hp <= 0) killZombie(z, Math.sign(b.vx)); else snd('zhit');
+          if (b.pierce-- <= 0){ b.life = 0; break; }
         }
-        registerHit(b.x,b.y);
-        if(b.slow)z.slow=180;
-        z.hp -= b.dmg; z.flash = 4; b.hit.add(z); z.x += Math.sign(b.vx) * (z.type==='brute' ? .8 : 2.5);
-        gore(b.x, b.y, 2);
-        if (z.hp <= 0) killZombie(z, Math.sign(b.vx)); else snd('zhit');
-        if (b.pierce-- <= 0){ b.life = 0; break; }
+      }
+      const B = L.boss;
+      if (b.life > 0 && B && !B.dead && b.x > B.x && b.x < B.x + B.w && b.y > B.y && b.y < B.y + B.h){
+        if(b.slow)B.slow=180;
+        damageBoss(b.dmg); b.life = 0; gore(b.x, b.y, 2); if (frame % 3 === 0) snd('bosshit');
       }
     }
-    const B = L.boss;
-    if (b.life > 0 && B && !B.dead && b.x > B.x && b.x < B.x + B.w && b.y > B.y && b.y < B.y + B.h){
-      if(b.slow)B.slow=180;
-      damageBoss(b.dmg); b.life = 0; gore(b.x, b.y, 2); if (frame % 3 === 0) snd('bosshit');
-    }
+    if(b.life>0)b.life--;
   }
   bullets = bullets.filter(b => b.life > 0);
 
@@ -1429,6 +1446,7 @@ function update(){
   }
   spits = spits.filter(s => s.t > 0);
 
+  if(state!=='play'){updateFx();return;}
   // power-up crate after boss
   if (L.crate){
     const c = L.crate;
@@ -1442,6 +1460,7 @@ function update(){
     }
   }
 
+  if(gameMode==='survival' && activeRun.breakTicks===0)updateSurvival();
   // flag pole
   if (L.flagX > 0 && p.x + p.w >= L.flagX*T - 4){
     finishStage();if(gameMode!=='campaign')return;state='clear'; clearPhase = 0; snd('flag');
