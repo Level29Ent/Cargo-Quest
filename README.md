@@ -120,7 +120,7 @@ Each stage has a deterministic layout, course-specific scenery/palette, element 
 
 | Course | Distinct element |
 | --- | --- |
-| Neon Market | Overhead supply crates award coins when hit from below |
+| Neon Market | Hit teal + boxes from below for powers; gold ? boxes award king cakes |
 | Canal Bridges | Green spring pads launch the player |
 | Iron Foundry | Steam vents warn before dealing damage |
 | Skyline Rooftops | Updrafts extend held jumps |
@@ -135,7 +135,7 @@ Element strips are placed only on intact open street, never across a pit. Timed 
 
 ## Coins and eighteen power-ups
 
-King cakes award 1 coin and defeated zombies award 3, separate from score and the 50-cake extra-life counter. Free stage caches cycle through the power-up catalog. Existing boss upgrades are unchanged.
+King cakes award 1 coin and defeated zombies award 3, separate from score and the 50-cake extra-life counter. Free stage caches cycle through the power-up catalog. Teal **+ power boxes** now appear throughout each campaign route: one is placed on safe, open street in each eligible 28-tile stretch before the protected finish, and half the existing mystery boxes also become power boxes. Hit them from below to instantly receive one of the eighteen powers with a reward pop and its name. Each box works once per attempt; its reward is deterministic and costs no coins. Medkit boxes, remaining king-cake boxes and boss upgrades stay unchanged. Daily Dispatch replaces power boxes with ordinary king-cake boxes to retain its no-free-powers rule; Survival has no boxes.
 
 | Power | Coins | Effect |
 | --- | ---: | --- |

@@ -9,7 +9,7 @@ function el(){return {set width(v){this._width=v;drawing.imageSmoothingEnabled=t
 const listeners={};
 const sandbox={console,Math,Set,Image:function(){},innerWidth:390,innerHeight:844,performance:{now:()=>0},requestAnimationFrame(){},setTimeout(){},addEventListener(name,fn){listeners[name]=fn;},document:{getElementById:id=>nodes[id]??=el(),createElement:()=>el(),createTextNode:text=>({textContent:text}),querySelectorAll:()=>[],addEventListener(name,fn){listeners[name]=fn;}},localStorage:{getItem:k=>store[k]??null,setItem:(k,v)=>store[k]=v}};
 sandbox.window=sandbox;
-src=src.replace('window.__game =',`window.test={buildLevel,moveBody,newGame,update,openShop,closeShop,purchasePower,earnCoins,addBolt,killZombie,hurtPlayer,fire,spawnBoss,SHOP_POWERS,WEAPONS,selectWeapon,grantPower,COURSES,fit,drawHUD,togglePause,releaseControls,finishStage,updateCargo,dropCargo,equipCosmetic,medalCount,loadCampaign,saveCampaign,updateBoss,targetTicks,openCampaign,closeCampaign,startDaily,startSurvival,dailyContract,finishMode,retryMode,spawnWave,updateSurvival,loadModeRecords,renderFieldGuide,modeStatus,drawScreens,startLevel,drawLevel,drawKingCake,makeZombie,detonate,clearShot,startCelebration,updateClear,loop,
+src=src.replace('window.__game =',`window.test={hitBlock,buildLevel,moveBody,newGame,update,openShop,closeShop,purchasePower,earnCoins,addBolt,killZombie,hurtPlayer,fire,spawnBoss,SHOP_POWERS,WEAPONS,selectWeapon,grantPower,COURSES,fit,drawHUD,togglePause,releaseControls,finishStage,updateCargo,dropCargo,equipCosmetic,medalCount,loadCampaign,saveCampaign,updateBoss,targetTicks,openCampaign,closeCampaign,startDaily,startSurvival,dailyContract,finishMode,retryMode,spawnWave,updateSurvival,loadModeRecords,renderFieldGuide,modeStatus,drawScreens,startLevel,drawLevel,drawKingCake,makeZombie,detonate,clearShot,startCelebration,updateClear,loop,
 get clearPhase(){return clearPhase},get gameMode(){return gameMode},get activeRun(){return activeRun},get modeRecords(){return modeRecords},
 get campaign(){return campaign},get cosmetics(){return COSMETICS},
 get parts(){return parts},
@@ -446,6 +446,37 @@ audit('celebration respects reduced motion and campaign overlay pause, then fina
  t.state='clear';const partyTicks=t.L.celebration.ticks;t.openCampaign();for(let i=0;i<30;i++)t.update();assert.equal(t.L.celebration.ticks,partyTicks);t.closeCampaign();delete sandbox.matchMedia;
  for(let n=0;n<600 && t.state==='clear';n++)t.update();assert.equal(t.state,'win','last level reaches win rather than generating stage 101');
  t.newGame(0);assert.equal(t.L.celebration,undefined,'retries/new levels reset party');
+});
+
+audit('power boxes are scattered, deterministic, single-use and use all eighteen rewards',()=>{
+ const rewards=new Set();
+ for(let i=0;i<100;i++){
+  const l=t.buildLevel(i),again=t.buildLevel(i),entries=Object.entries(l.boxPowers);
+  assert.deepEqual(JSON.parse(JSON.stringify(l.boxPowers)),JSON.parse(JSON.stringify(again.boxPowers)));
+  assert.ok(entries.length>0,'every campaign stage has powers');
+  if(!l.info.isBoss)assert.ok(entries.length>=3,'multiple powers along each normal route');
+  for(const [key,id] of entries){const [x,y]=key.split(',').map(Number);assert.equal(l.grid[y][x],'S');assert.ok(x<(l.info.isBoss?19:l.W-52));rewards.add(id);}
+  // The first added box is always reachable from the street without any upgrades.
+  t.newGame(i);t.state='play';t.L.zs=[];t.L.elements=[];t.L.pickups=[];t.L.bolts=[];
+  const [x,y]=Object.keys(t.L.boxPowers).find(key=>{const [x,y]=key.split(',').map(Number);return y===8 && t.L.grid[12][x]==='#' && [9,10,11].every(y=>t.L.grid[y][x]===' ');}).split(',').map(Number);
+  Object.assign(t.p,{x:x*32+3,y:324,vx:0,vy:0,onGround:true,coyote:8,inv:9999});
+  t.touch.J=true;t.jump();for(let n=0;n<20 && t.L.grid[y][x]==='S';n++)t.update();t.releaseControls();
+  assert.equal(t.L.grid[y][x],'U','normal jump activates a box in stage '+i);
+ }
+ assert.equal(rewards.size,18);
+ for(const item of t.SHOP_POWERS){
+  cleanRun();t.L.grid[8][10]='S';t.L.boxPowers={'10,8':item.id};t.p.health=1;
+  const wallet=t.wallet,time=t.time;t.hitBlock(10,8);
+  assert.equal(t.L.grid[8][10],'U');assert.equal(t.wallet,wallet,'free rewards never spend coins');
+  if(item.id==='heal')assert.equal(t.p.health,3);else if(item.id==='time')assert.equal(t.time,time+60);else assert.equal(t.effects[item.id],1800);
+  assert.ok(t.parts.some(p=>p.kind==='powerpop'));t.drawLevel();
+  const effects=JSON.stringify(t.effects),health=t.p.health,after=t.time,count=t.parts.length;
+  t.hitBlock(10,8);assert.equal(JSON.stringify(t.effects),effects);assert.equal(t.p.health,health);assert.equal(t.time,after);assert.equal(t.parts.length,count,'used box gives no second reward');
+ }
+ cleanRun();t.L.grid[8][10]='?';const coins=t.wallet;t.hitBlock(10,8);assert.equal(t.wallet,coins+1);
+ t.L.grid[8][11]='M';t.p.health=1;t.hitBlock(11,8);assert.equal(t.p.health,2,'medkit still heals one heart');
+ t.startDaily('2026-11-19');assert.ok(!t.L.grid.some(row=>row.includes('S')));assert.equal(Object.keys(t.L.boxPowers).length,0);
+ t.startSurvival();assert.ok(!t.L.grid.some(row=>row.includes('S')));
 });
 if(auditFailures.length)throw Error('AUDIT FAILURES\n'+auditFailures.join('\n'));
 module.exports = { test: t };
