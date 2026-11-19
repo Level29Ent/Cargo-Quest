@@ -9,8 +9,8 @@ function el(){return {set width(v){this._width=v;drawing.imageSmoothingEnabled=t
 const listeners={};
 const sandbox={console,Math,Set,Image:function(){},innerWidth:390,innerHeight:844,performance:{now:()=>0},requestAnimationFrame(){},setTimeout(){},addEventListener(name,fn){listeners[name]=fn;},document:{getElementById:id=>nodes[id]??=el(),createElement:()=>el(),createTextNode:text=>({textContent:text}),querySelectorAll:()=>[],addEventListener(name,fn){listeners[name]=fn;}},localStorage:{getItem:k=>store[k]??null,setItem:(k,v)=>store[k]=v}};
 sandbox.window=sandbox;
-src=src.replace('window.__game =',`window.test={hitBlock,buildLevel,moveBody,newGame,update,openShop,closeShop,purchasePower,earnCoins,addBolt,killZombie,hurtPlayer,fire,spawnBoss,SHOP_POWERS,WEAPONS,selectWeapon,grantPower,COURSES,fit,drawHUD,togglePause,releaseControls,finishStage,updateCargo,dropCargo,equipCosmetic,medalCount,loadCampaign,saveCampaign,updateBoss,targetTicks,openCampaign,closeCampaign,startDaily,startSurvival,dailyContract,finishMode,retryMode,spawnWave,updateSurvival,loadModeRecords,renderFieldGuide,modeStatus,drawScreens,startLevel,drawLevel,drawKingCake,makeZombie,detonate,clearShot,startCelebration,updateClear,loop,
-get clearPhase(){return clearPhase},get gameMode(){return gameMode},get activeRun(){return activeRun},get modeRecords(){return modeRecords},
+src=src.replace('window.__game =',`window.test={updateAdventure,drawAdventure,registerHit,hitBlock,buildLevel,moveBody,newGame,update,openShop,closeShop,purchasePower,earnCoins,addBolt,killZombie,hurtPlayer,fire,spawnBoss,SHOP_POWERS,WEAPONS,selectWeapon,grantPower,COURSES,fit,drawHUD,togglePause,releaseControls,finishStage,updateCargo,dropCargo,equipCosmetic,medalCount,loadCampaign,saveCampaign,updateBoss,targetTicks,openCampaign,closeCampaign,startDaily,startSurvival,dailyContract,finishMode,retryMode,spawnWave,updateSurvival,loadModeRecords,renderFieldGuide,modeStatus,drawScreens,startLevel,drawLevel,drawKingCake,makeZombie,detonate,clearShot,startCelebration,updateClear,loop,
+get score(){return score},get popups(){return popups},get clearPhase(){return clearPhase},get gameMode(){return gameMode},get activeRun(){return activeRun},get modeRecords(){return modeRecords},
 get campaign(){return campaign},get cosmetics(){return COSMETICS},
 get parts(){return parts},
 get frame(){return frame},get weaponIndex(){return weaponIndex},set frame(v){frame=v},
@@ -479,6 +479,61 @@ audit('existing mystery boxes contain deterministic single-use powers from all e
  t.L.grid[8][11]='M';t.p.health=1;t.hitBlock(11,8);assert.equal(t.p.health,2,'medkit still heals one heart');
  t.startDaily('2026-11-19');assert.ok(!t.L.grid.some(row=>row.includes('S')));assert.equal(Object.keys(t.L.boxPowers).length,0);
  t.startSurvival();assert.ok(!t.L.grid.some(row=>row.includes('S')));
+});
+
+audit('dash is edge-triggered, collision-safe, pause-safe and limited in air',()=>{
+ const dash=()=>{listeners.keydown({key:'v',repeat:false,preventDefault(){}});t.update();listeners.keyup({key:'v'});};
+ combatRoom();t.p.face=1;const x=t.p.x;dash();assert.equal(t.p.x-x,8);assert.equal(t.p.dashCd,75);assert.equal(t.p.inv,0,'dash grants no invulnerability');
+ const cd=t.p.dashCd;t.togglePause();dash();assert.equal(t.p.dashCd,cd);assert.equal(t.p.dashTicks,0);t.togglePause();
+ combatRoom();t.L.grid[10][4]='H';t.L.grid[11][4]='H';t.p.x=100;dash();assert.ok(t.p.x+t.p.w<=128);assert.equal(t.p.dashTicks,0,'wall ends dash');
+ combatRoom();t.p.onGround=false;t.p.y=150;t.p.coyote=0;dash();assert.equal(t.p.airDashed,true);
+ t.p.dashTicks=0;t.p.dashCd=0;dash();assert.equal(t.p.dashTicks,0,'no repeat airborne dash before landing');
+ t.p.onGround=true;t.p.y=324;dash();assert.ok(t.p.dashTicks>0,'landing restores airborne dash');
+ combatRoom();nodes.bDash.events.pointerdown({pointerId:99,preventDefault(){}});t.update();assert.equal(t.p.dashCd,75);t.releaseControls();assert.equal(t.touch.D,false);assert.equal(t.p.dashTicks,0);
+ sandbox.matchMedia=()=>({matches:true});combatRoom();dash();assert.ok(!t.parts.some(p=>p.kind==='dash'));delete sandbox.matchMedia;
+});
+audit('charger warns, locks direction, rushes, recovers and respects freeze and stagger',()=>{
+ combatRoom();const z=t.makeZombie(340,'charger','nola',()=>.5);Object.assign(z,{active:true,onGround:true});t.L.zs=[z];
+ t.update();assert.equal(z.chargeState,'warn');assert.equal(z.chargeTicks,45);assert.equal(Math.abs(z.vx),0);
+ for(let i=0;i<44;i++)t.update();assert.equal(z.chargeState,'warn');
+ t.effects.freeze=10;t.update();assert.equal(z.chargeTicks,1);t.effects.freeze=0;t.update();assert.equal(z.chargeState,'rush');assert.equal(z.vx,-5);
+ z.stagger=2;t.update();assert.equal(Math.abs(z.vx),0);assert.equal(z.chargeTicks,30);
+ z.stagger=0;z.chargeTicks=1;t.update();assert.equal(z.chargeState,'recover');assert.equal(Math.abs(z.vx),0);
+ z.chargeTicks=1;t.update();assert.equal(z.chargeState,'stalk');
+ z.chargeState='rush';z.chargeTicks=20;z.chargeDir=1;z.x=299;t.L.grid[10][10]='H';t.L.grid[11][10]='H';t.update();assert.equal(z.chargeState,'recover','wall ends rush');
+ const roster=new Set();t.startSurvival();for(let i=0;i<8;i++){t.spawnWave();for(const z of t.L.zs)roster.add(z.type);}assert.ok(roster.has('charger'));
+});
+audit('combat feedback reports damage and streaks without changing weapon damage',()=>{
+ combatRoom();const z=enemy('walker');z.x=155;t.L.zs=[z];t.fire();t.update();assert.equal(z.hp,19);assert.equal(z.stagger,6);assert.ok(t.popups.some(q=>q.damage && q.txt==='1'));assert.ok(t.parts.some(q=>q.kind==='impact'));
+ const x=z.x;t.update();assert.equal(z.x,x,'hit stagger stops movement');
+ combatRoom();const score=t.score;for(let i=0;i<3;i++)t.killZombie({dead:false,active:false,pts:100,x:200,y:324,w:24,h:48},1);
+ assert.equal(t.p.streak,3);assert.equal(t.score-score,600,'three kills award 300 score plus 300 streak bonus');
+ t.p.inv=0;t.hurtPlayer(200);assert.equal(t.p.streak,0);assert.equal(t.p.streakTicks,0);
+ t.registerHit(200,200,2.5);t.drawAdventure();assert.ok(hudText.includes('2.5'),'shared overlay renders damage text');
+});
+audit('optional ring run, secrets and beams are single-use, pausable and mode-isolated',()=>{
+ combatRoom();const startWallet=t.wallet;t.L.bonus={rings:[100,180,260].map(x=>({x,y:340,got:false})),ticks:0,started:false,done:false,failed:false};
+ t.p.x=88;t.p.y=310;t.updateAdventure();assert.equal(t.L.bonus.ticks,600);
+ t.openShop();for(let i=0;i<30;i++)t.update();assert.equal(t.L.bonus.ticks,600);t.closeShop();
+ for(const x of [180,260]){t.p.x=x-12;t.updateAdventure();}assert.equal(t.L.bonus.done,true);assert.equal(t.wallet,startWallet+15);t.updateAdventure();assert.equal(t.wallet,startWallet+15);
+ t.L.bonus.done=false;t.L.bonus.ticks=1;t.L.bonus.rings[2].got=false;t.updateAdventure();assert.equal(t.L.bonus.failed,true,'time expiry cannot grant a last-tick reward');
+ t.L.grid[8][10]='B';t.L.secrets={'10,8':true};const wallet=t.wallet;t.hitBlock(10,8);t.hitBlock(10,8);assert.equal(t.wallet,wallet+10);assert.equal(t.L.grid[8][10],' ');
+ combatRoom();t.L.sweepers=[{x:96,w:32,phase:0}];t.frame=179;t.update();assert.equal(t.p.health,2,'active beam damages grounded player');
+ combatRoom();t.L.sweepers=[{x:96,w:32,phase:0}];t.frame=179;t.p.y=260;t.p.onGround=false;t.update();assert.equal(t.p.health,3,'jump clears beam');
+ t.startDaily('2026-11-19');assert.equal(t.L.bonus,null);assert.equal(t.L.sweepers.length,0);assert.equal(Object.keys(t.L.secrets).length,0);
+ t.startSurvival();assert.equal(t.L.bonus,null);assert.equal(t.L.sweepers.length,0);assert.equal(Object.keys(t.L.secrets).length,0);
+});
+audit('optional content stays on intact street, out of exits, and retains original box layout',()=>{
+ let rings=0,beams=0,secrets=0,chargers=0;
+ for(let i=0;i<100;i++){
+  const l=t.buildLevel(i);
+  for(const e of l.sweepers){beams++;const x=e.x/32;assert.equal(l.grid[12][x],'#');assert.ok(x<l.W-60);assert.ok(!l.elements.some(other=>e.x<other.x+other.w && e.x+e.w>other.x));}
+  if(l.bonus){rings++;assert.equal(l.bonus.rings.length,3);for(const r of l.bonus.rings){const x=Math.floor(r.x/32);assert.equal(l.grid[12][x],'#');assert.ok(x<l.W-60);}}
+  for(const key of Object.keys(l.secrets)){secrets++;const [x,y]=key.split(',').map(Number);assert.equal(l.grid[y][x],'B');}
+  chargers+=l.zs.filter(z=>z.type==='charger').length;
+  t.newGame(i);t.state='play';t.drawAdventure();
+ }
+ assert.ok(rings>40);assert.ok(beams>40);assert.ok(secrets>20);assert.ok(chargers>0);
 });
 if(auditFailures.length)throw Error('AUDIT FAILURES\n'+auditFailures.join('\n'));
 module.exports = { test: t };

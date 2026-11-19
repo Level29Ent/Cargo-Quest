@@ -12,6 +12,10 @@ The enhanced renderer uses smooth low-poly sphere/cylinder/cone characters, an a
 
 The renderer uses shared instanced geometry/materials, view-window culling, and native-density output up to 2× with a three-million-pixel budget shared in policy by the 3D and HUD canvases. It defaults to 3D on WebGL2-capable browsers. The 3D/2D button switches rendering without restarting gameplay. If WebGL initialization or its context fails, gameplay falls back to the original 2D renderer. Real device performance still depends on GPU/browser support. 
 
+## Character art polish
+
+The 3D courier keeps the purple/green/gold jester identity, with a harness, diamond applique, delivery pack, gloves, kneepads and more sculpted face/ears/brows. Medal-earned outfit and weapon colors remain visible. Infected use role-specific clothing and skin palettes, inset sockets, brows, uneven teeth, torn hems and scars; brutes get broader shoulders. Existing shields, medic crosses, armor, thief bags and attack warnings remain distinct. The 2D fallback gains matching tailoring, a pack, scars and fabric tears while retaining the original logo head. All details reuse instanced primitives; no textures or dependencies were added. Actor hitboxes, stats, animations, level tiles and ?-box rewards are unchanged by this art pass.
+
 ## Visual readability
 
 Collectibles are oval king cakes inspired by traditional Mardi Gras pastries: golden-brown rings with open centers, white icing drips, and alternating purple, green and gold sugar. Both 3D and 2D views, the HUD counter and supply-crate reward pops use the cake artwork. Pickup positions, magnet range, scoring, the 50-cake extra life and saved coin balances are unchanged. Storm-course lightning hazards are still hazards.
@@ -29,11 +33,23 @@ Stage medals, delivery rewards and speed records still commit at the original fl
 ## Controls
 
 - Move: A/D or arrows. Jump: Space/W/Up (hold for height; tap for a short platform hop).
+- Dash: V or touch DASH. Burst in the held direction (or facing direction), with a 1.25-second recharge and at most one airborne dash per landing. It does not grant invulnerability or pass through walls.
 - Fire: F/J/Z/K or mouse. Sprint: Shift/X. Mobile: onscreen movement, FIRE, JUMP.
 - Weapon: Q (next), E (previous), keys 1–9, the top-left weapon button, or the free loadout in the store.
 - Start/resume: Enter or tap. Pause: P. Restart stage: R. Title arrows select any starting stage.
 - Campaign: CAMPAIGN button or C. Escape closes it.
 - Store: STORE button or B. Escape closes it. Shopping pauses gameplay and effect timers.
+
+## Gameplay expansion
+
+- **Dash and movement:** a ten-tick horizontal burst supplements the existing variable-height jumps, coyote grace and jump buffer. Gravity continues during dash; it cannot bypass walls or enemy damage. Pause/focus loss clears a running dash. Touch has a separate DASH control; the HUD shows recharge.
+- **Combat feel:** shots show impact sparks and floating damage numbers in either view. Zombies briefly stagger for six ticks without suspending gravity; bosses do not stagger. Three kills within a rolling three-second window earn a score bonus (100 × streak length every third kill). Taking damage resets the streak. Weapon damage, heat and switching rules are unchanged.
+- **Charger zombie:** orange shoulder pads and a warning marker distinguish this four-health enemy. It warns for 45 ticks, locks its direction, rushes for 30 ticks, and recovers for 60 ticks. Walls end its rush. Freeze and stagger pause its charge sequence; Cryo reduces rush speed. It replaces a walker on eligible campaign stages from stage 4 and joins Survival from wave 5.
+- **Optional ring runs:** on eligible normal campaign stages, collect three purple rings in order within ten seconds of collecting the first. Success grants 15 base coins and 1500 score once per attempt; expiry simply ends the optional challenge. The HUD tracks rings and remaining time.
+- **Secrets:** one eligible existing brick per normal stage gets a small star clue. Break it for 10 base coins and 1000 score once per attempt. No new boxes or collision tiles are added. Existing ?-box powers stay intact.
+- **Sweep beams:** eligible open street gets a narrow gold marker, a one-second warning, then a low red beam for 35 ticks per four-second cycle. Jump over it. Markers stay away from ring runs, pits, existing element strips and the protected finish approach. They do not block movement.
+
+New ring runs, brick secrets and sweep beams are campaign-only; Daily Dispatch and Survival do not award these rewards. Retry resets the optional objectives; rewards are per attempt, not permanent collectibles. Double Coins applies to their base coin rewards. Existing saved progress and currency are preserved. Effects and objectives pause with the game/store/Dispatch overlay. Reduced motion suppresses dash trails.
 
 ## Responsive game feel
 
