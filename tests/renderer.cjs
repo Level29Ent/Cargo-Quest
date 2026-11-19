@@ -58,7 +58,7 @@ for(const stage of [4,9,14,19,24]){
  for(const m of lastScene.children.filter(m=>m.isInstancedMesh))if(m.count)assert.ok(m.instanceMatrix.array.subarray(0,m.count*16).every(Number.isFinite));
 }
 // Every new enemy/weapon/effect takes the real geometry path, with finite transforms.
-for(const type of ['leaper','plated','medic','charger']){
+for(const type of ['leaper','plated','medic','charger','crawler']){
  test.newGame(20);test.state='play';const z=test.makeZombie(300,type,'nola',()=>.5);
  Object.assign(z,{active:true,hp:1,attack:15});test.L.zs=[z];
  for(const w of test.WEAPONS.slice(6)){
@@ -69,7 +69,7 @@ for(const type of ['leaper','plated','medic','charger']){
  }
 }
 // Hero tailoring and infected role colors are visual only and survive every facing/flash pose.
-for(const type of ['walker','runner','brute','shield','thief','thrower','plated','medic','leaper','charger']){
+for(const type of ['walker','runner','brute','shield','thief','thrower','plated','medic','leaper','charger','crawler']){
  test.newGame(0);test.state='play';const z=test.makeZombie(350,['shield','thief','thrower'].includes(type)?'walker':type,'nola',()=>.5);z.type=type;z.active=true;test.L.zs=[z];
  const game={L:test.L,cam:0,frame:200,player:test.p,effects:{},weapon:test.WEAPONS[0],flagY:64,bullets:[],spits:[],parts:[],state:'play',cosmetic:{outfit:'#31bcb7',skin:'#bac5d1'}};
  for(const face of [-1,1])for(const flash of [0,4]){

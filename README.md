@@ -37,8 +37,22 @@ Stage medals, delivery rewards and speed records still commit at the original fl
 - Fire: F/J/Z/K or mouse. Sprint: Shift/X. Mobile: onscreen movement, FIRE, JUMP.
 - Weapon: Q (next), E (previous), keys 1–9, the top-left weapon button, or the free loadout in the store.
 - Start/resume: Enter or tap. Pause: P. Restart stage: R. Title arrows select any starting stage.
+- Cargo contract: G / CARGO before pickup. Secret tunnel: T / TUNNEL beside a marked hatch.
 - Campaign: CAMPAIGN button or C. Escape closes it.
 - Store: STORE button or B. Escape closes it. Shopping pauses gameplay and effect timers.
+
+## Delivery adventures
+
+All six additions build on the existing campaign; the new objectives are optional and do not replace ? boxes or boss-stage rewards.
+
+1. **Rescue escorts:** eligible normal stages have a survivor on safe street. Contact them to begin an escort that follows a bounded 24-frame history of your path, including jumps. They have three health and lose one when you actually take damage (not on shielded hits). Reach the normal finish while escorting them for 30 base coins and 3000 score. A lost escort does not block the stage. This is a trail-following companion, not an independent navigation/combat AI.
+2. **Swamp Crawler mini-boss:** eligible third stages of a five-stage route add an optional six-legged, 16-health monster. It telegraphs a charge for 45 ticks, then releases a low jumpable ground wave and rushes before recovering. Stomps deal three damage. Defeat pays 20 base coins plus normal kill rewards once per attempt. Regional bosses remain unchanged.
+3. **Secret routes:** eligible even-index stages add a short stepped rooftop/cache route above intact street; jump from street onto the low ledge, then short-hop onto the upper roof for 12 coins and 1200 score. Eligible odd-index stages have marked tunnel hatches: stand by the entry and press T / TUNNEL for an **instant forward shortcut** and 8 coins/800 score. There is no separate underground map. Routes are once per attempt, preserve existing boxes, and keep the protected finish clear.
+4. **Enemy reactions:** bullet knockback now sweeps against walls without applying gravity twice. Piercing rounds visibly crack plated armor, removing its normal-bullet damage reduction for that enemy. Shields shed a shard when staggered. Crawlers crumble and leapers dissolve on death; ordinary zombies retain their directional fall. Shared overlays show the new effects in 2D/3D.
+5. **Cargo choices:** press G / CARGO before the first pickup to cycle Standard, Fragile, Explosive or Medical. Pickup locks the contract for the attempt. Standard preserves original rules. Fragile has one integrity and pays +20 coins if intact. Explosive has three integrity, pays +25 coins and bursts once for five nearby enemy damage on the first unshielded hit (no extra self damage). Medical has three integrity, heals one heart every ten active seconds while intact/carried, and pays +15 coins plus a full heal at delivery. Actual hits reduce integrity; zero integrity forfeits the specialty bonus but does not block the ordinary cargo medal. Rewards are base coins; Double Coins applies.
+6. **Midway checkpoints:** eligible normal stages have an auto-activating street flag near the middle. Losing a life returns to it with full health and brief invulnerability, preserving the current level's opened boxes, kills, rewards, cargo integrity and optional-objective state. It does **not** respawn collectible rewards or reset active time. Timeout recovery grants 120 timer units; checkpoint recovery cannot earn a new speed medal. R remains a full fresh attempt. Checkpoints are in-memory for the current attempt, not saved across page reloads.
+
+New contracts, escorts, mini-boss spawns, route rewards and checkpoints are campaign-only. Daily Dispatch removes those objectives and new mini-bosses (but uses the same rooftop geometry); Survival keeps its existing arena. Pause/store/Dispatch overlays suspend active objectives. New-run/restart resets these optional rewards, so coin rewards remain replayable per attempt like existing rings/secrets. No real money, new dependencies, save migration, or permanent survivor collection is added.
 
 ## Gameplay expansion
 

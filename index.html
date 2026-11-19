@@ -39,7 +39,7 @@
   #touch .grp{gap:8px} @media(max-width:460px){#touch button{width:52px;height:52px}#touch button.fire,#touch button.jump{width:68px;height:68px}#touch{padding-left:8px;padding-right:8px}}
   #renderStatus{top:122px;bottom:auto;font-size:9px}
   @media(min-width:700px){#bWeapon{top:10px;left:140px}#bView{top:10px;right:130px}#courseStatus{top:50px}#renderStatus{top:72px}}
-  @media (pointer:coarse){#touch{display:flex}}
+  @media (pointer:coarse){#touch{display:flex}#bContract,#bRoute{bottom:112px!important;font-size:10px}}
   #bCampaign{position:absolute;top:52px;right:90px;z-index:5;padding:9px;background:#243649;color:#fff;border:1px solid #74e8da;border-radius:6px;font:11px monospace;cursor:pointer}
   #campaign{position:fixed;inset:12px;z-index:25;max-width:850px;margin:auto;padding:20px;box-sizing:border-box;overflow:auto;touch-action:pan-y;background:#101d2c;color:#e7f5ff;border:2px solid #74e8da;border-radius:12px;font:14px/1.6 monospace}
   #fieldGuide{margin:16px 0;padding:12px;border:1px solid #607c8b;border-radius:6px} #fieldGuide summary{cursor:pointer;color:#ffe08a} #guideEntries p{margin:10px 0} #modeRecords{color:#b7f6e9}
@@ -73,6 +73,7 @@
 <div id="wrap">
   <canvas id="world3d" aria-label="3D game world"></canvas>
   <canvas id="c" tabindex="0" width="800" height="448" aria-label="Cargo Quest: Zombie Streets platformer game"></canvas>
+  <button id="bContract" style="position:absolute;bottom:12px;left:12px;z-index:5;padding:10px;background:#142b35;color:#ffe08a;border:1px solid #74e8da" aria-label="Choose cargo contract">CARGO: STANDARD [G]</button><button id="bRoute" style="position:absolute;bottom:52px;right:12px;z-index:5;padding:10px;background:#142b35;color:#fff;border:1px solid #74e8da" aria-label="Use secret tunnel">TUNNEL [T]</button>
   <button id="bPause" aria-label="Pause or resume game">PAUSE [P]</button>
   <button id="bS" aria-label="Toggle music and sound">♪ ON</button>
   <button id="bView" aria-label="Toggle 3D rendering">3D · ON</button>
@@ -472,6 +473,8 @@ addEventListener('keydown', e => {
   if ([' ','arrowup','arrowdown','arrowleft','arrowright'].includes(k)) e.preventDefault();
   if (!keys[k] && (k===' '||k==='w'||k==='arrowup')) jumpPressed = true;
   if(k==='v' && !e.repeat)dashPressed=true;
+  if(k==='g' && !e.repeat)cycleContract();
+  if(k==='t' && !e.repeat)useTunnel();
   keys[k] = true;
   ensureAudio();
   if (k==='enter' && !e.repeat) onEnter();
@@ -514,7 +517,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden)suspendGame
 document.getElementById('bS').addEventListener('click', e => { e.stopPropagation(); ensureAudio(); setSoundMode(soundMode + 1); });
 bindBtn('bDash','D'); bindBtn('bL','L'); bindBtn('bR','R'); bindBtn('bJ','J'); bindBtn('bF','F');
 // Pointer-operated HUD controls return keyboard movement/jump focus to the game.
-for(const id of ['bPause','bS','bWeapon','bView'])document.getElementById(id).addEventListener('click',e=>{
+for(const id of ['bPause','bS','bWeapon','bView','bContract','bRoute'])document.getElementById(id).addEventListener('click',e=>{
   if(e.detail>0)cv.focus({preventScroll:true});
 });
 cv.addEventListener('pointerdown', e => {
@@ -642,6 +645,7 @@ function decorateCourse(level){
   }
   // Reachable, free power caches create variety without spending saved coins.
   level.pickups=[{x:7*T,y:GROUND-30,id:SHOP_POWERS[(level.i+8)%SHOP_POWERS.length].id,got:false}];
+  addDeliveryContent(level);
   return level;
 }
 const SOLID = new Set(['#','H','B','?','M','U','P','p','=']);
@@ -748,12 +752,90 @@ function makeZombie(x, type, loc, rng){
   if (type==='brute'){ z.w=38; z.h=64; z.hp=7; z.speed=.42; z.pts=500; }
   if(type==='leaper'){z.w=26;z.h=40;z.hp=3;z.speed=.8;z.pts=300;z.attack=100;}
   if(type==='plated'){z.w=32;z.h=52;z.hp=6;z.speed=.5;z.pts=400;}
+  if(type==='crawler'){z.w=54;z.h=34;z.hp=16;z.speed=.35;z.pts=2000;z.chargeState='stalk';z.chargeTicks=0;z.chargeDir=-1;z.miniBoss=true;}
   if(type==='charger'){z.w=30;z.h=48;z.hp=4;z.speed=.55;z.pts=350;z.chargeState='stalk';z.chargeTicks=0;z.chargeDir=-1;}
   if(type==='medic'){z.w=26;z.h=46;z.hp=4;z.speed=.45;z.pts=350;z.attack=180;}
   z.maxHp = z.hp;
   z.y = GROUND - z.h;
   return z;
 }
+
+// Campaign-only delivery adventures. Existing ? boxes are never replaced or moved.
+function addDeliveryContent(level){
+  level.delivery={kind:'standard',integrity:3,paid:false};level.rescue=null;level.checkpoint=null;level.secretRoute=null;
+  if(level.info.isBoss)return;
+  const safe=[];
+  for(let x=15;x<level.W-58;x++)if([-2,-1,0,1,2].every(dx=>level.grid[12][x+dx]==='#' && [9,10,11].every(y=>level.grid[y][x+dx]===' ')) &&
+    !level.elements.some(e=>(x-2)*T<e.x+e.w && (x+3)*T>e.x) &&
+    !level.sweepers.some(e=>Math.abs(e.x-x*T)<4*T))safe.push(x);
+  const mid=safe.find(x=>x>level.W*.45);
+  if(mid!==undefined)level.checkpoint={x:mid*T,y:GROUND-60,active:false,used:false};
+  const early=safe.find(x=>x>20 && (!level.checkpoint || Math.abs(x*T-level.checkpoint.x)>6*T));
+  if(early!==undefined)level.rescue={x:early*T,y:GROUND-44,w:20,h:44,health:3,following:false,delivered:false,lost:false,trail:[]};
+  const span=Array.from({length:level.W-66},(_,n)=>n+4).find(x=>Array.from({length:11},(_,n)=>x+n-3).every(tx=>
+    level.grid[12][tx]==='#' && [5,6,7,8,9,10,11].every(y=>level.grid[y][tx]===' ') &&
+    !level.elements.some(e=>tx*T<e.x+e.w && (tx+1)*T>e.x)) &&
+    (!level.checkpoint || Math.abs(x*T-level.checkpoint.x)>12*T));
+  if(span!==undefined){
+    const kind=level.i%2?'tunnel':'rooftop';level.secretRoute={kind,x:span*T,exit:(span+7)*T,claimed:false};
+    if(kind==='rooftop')for(let n=0;n<6;n++)level.grid[n<2||n>=4?9:7][span+n]='=';
+  }
+  const arena=safe.find(x=>x>level.W*.6 && (!level.checkpoint || Math.abs(x*T-level.checkpoint.x)>7*T) &&
+    (!level.secretRoute || x*T<level.secretRoute.x-5*T || x*T>level.secretRoute.exit+5*T));
+  if(level.i%5===2 && arena!==undefined){const z=makeZombie(arena*T,'crawler',level.info.loc.id,()=>.5);level.zs.push(z);}
+}
+const CONTRACTS=['standard','fragile','explosive','medical'];
+function cycleContract(){
+  if(gameMode!=='campaign' || state!=='play' || shopOpen || campaignOpen || L.cargo.carried || L.cargo.delivered || L.delivery.locked)return false;
+  L.delivery.kind=CONTRACTS[(CONTRACTS.indexOf(L.delivery.kind)+1)%CONTRACTS.length];L.delivery.integrity=L.delivery.kind==='fragile'?1:3;
+  popups.push({x:player.x,y:player.y-15,t:90,txt:L.delivery.kind.toUpperCase()+' CONTRACT'});return true;
+}
+function useTunnel(){
+  const r=L.secretRoute;
+  if(gameMode!=='campaign' || state!=='play' || shopOpen || campaignOpen || !r || r.kind!=='tunnel' || r.claimed ||
+     !player.onGround || Math.abs(player.x-r.x)>48)return false;
+  r.claimed=true;player.x=r.exit;player.y=GROUND-player.h;player.vx=0;player.vy=0;player.safeX=player.x;
+  if(L.rescue?.following){L.rescue.x=player.x-30;L.rescue.y=GROUND-44;L.rescue.trail=[];}
+  earnCoins(8);addScore(800);snd('power');popups.push({x:player.x,y:player.y-20,t:120,txt:'SECRET TUNNEL · +8 COINS'});return true;
+}
+function resumeCheckpoint(){
+  const c=L.checkpoint;if(gameMode!=='campaign' || !c?.active)return false;
+  releaseControls();Object.assign(player,{x:c.x,y:c.y,vx:0,vy:0,onGround:true,health:maxHealth(),inv:180,heat:0,overheat:false,fireCd:0,dashTicks:0,dashCd:0,streak:0,streakTicks:0,safeX:c.x});
+  cam=Math.max(0,c.x-VW*.42);spits=[];bullets=[];c.used=true;
+  if(time<=0){time=120;hurried=false;}
+  if(L.rescue?.following){L.rescue.x=c.x-30;L.rescue.y=GROUND-44;L.rescue.trail=[];}
+  state='play';banner={txt:'CHECKPOINT',sub:'ONE LIFE USED · PROGRESS KEPT',t:100};return true;
+}
+function hurtDelivery(){
+  if(gameMode!=='campaign')return;
+  const d=L.delivery;
+  if(L.cargo.carried && d.kind!=='standard'){
+    d.integrity=Math.max(0,d.integrity-1);
+    if(d.kind==='explosive' && !d.burst){d.burst=true;detonate({x:player.x+player.w/2,y:player.y+30,dmg:5,blast:100,life:1});popups.push({x:player.x,y:player.y-20,t:90,txt:'VOLATILE CARGO BURST!'});}
+  }
+  const r=L.rescue;if(r?.following && !r.delivered && !r.lost){if(--r.health<=0){r.lost=true;r.following=false;popups.push({x:r.x,y:r.y,t:100,txt:'ESCORT LOST'});}}
+}
+function updateDelivery(){
+  if(gameMode!=='campaign')return;
+  const p=player,c=L.checkpoint,r=L.rescue,route=L.secretRoute,d=L.delivery;
+  if(d.kind==='medical' && L.cargo.carried && d.integrity>0 && L.runTicks>0 && L.runTicks%600===0)p.health=Math.min(maxHealth(),p.health+1);
+  if(c && !c.active && p.onGround && Math.abs(p.y-c.y)<4 && Math.abs(p.x-c.x)<32){c.active=true;snd('power');popups.push({x:c.x,y:c.y-20,t:100,txt:'CHECKPOINT ACTIVE'});}
+  if(r && !r.lost && !r.delivered){
+    if(!r.following && Math.hypot(p.x-r.x,p.y-r.y)<55){r.following=true;r.trail=[];snd('heal');}
+    if(r.following){r.trail.push({x:p.x,y:p.y+p.h-r.h});if(r.trail.length>24){const point=r.trail.shift();r.x=point.x;r.y=point.y;}}
+  }
+  if(route?.kind==='rooftop' && !route.claimed && p.onGround && p.x>route.x+2*T && p.x<route.x+4*T && p.y+p.h<=7*T+1){
+    route.claimed=true;earnCoins(12);addScore(1200);snd('power');popups.push({x:p.x,y:p.y-20,t:100,txt:'ROOFTOP CACHE · +12 COINS'});
+  }
+}
+function finishDelivery(){
+  if(gameMode!=='campaign' || L.delivery.paid)return;L.delivery.paid=true;
+  const d=L.delivery,r=L.rescue;
+  if(L.cargo.carried && d.kind!=='standard' && d.integrity>0){const reward=d.kind==='fragile'?20:d.kind==='explosive'?25:15;earnCoins(reward);addScore(reward*100);if(d.kind==='medical')player.health=maxHealth();}
+  if(r?.following && !r.lost){r.delivered=true;r.following=false;earnCoins(30);addScore(3000);popups.push({x:player.x,y:player.y-40,t:180,txt:'SURVIVOR RESCUED · +30 COINS'});}
+}
+document.getElementById('bContract').addEventListener('click',cycleContract);
+document.getElementById('bRoute').addEventListener('click',useTunnel);
 
 // ---------- Game state ----------
 let state = 'title', levelIdx = 0, L = null, player = null, cam = 0, startPick = 0;
@@ -806,7 +888,8 @@ function finishStage(){
   if(gameMode!=='campaign'){finishMode(true);return;}
   if(L.recorded)return;L.recorded=true;
   const old=campaign.stages[L.i]||{}, delivered=L.cargo.carried;
-  const fast=L.runTicks<=targetTicks(), grade=delivered?(fast?'GOLD':'SILVER'):null;
+  finishDelivery();
+  const fast=!L.checkpoint?.used && L.runTicks<=targetTicks(), grade=delivered?(fast?'GOLD':'SILVER'):null;
   campaign.stages[L.i]={clear:true,speed:!!old.speed||fast,cargo:!!old.cargo||delivered,
     ticks:Math.min(old.ticks||Infinity,Math.max(1,L.runTicks)),grade:old.grade==='GOLD'?'GOLD':grade||old.grade||null};
   if(delivered){L.cargo.delivered=true;if(!old.cargo)earnCoins(25);}
@@ -816,7 +899,7 @@ function finishStage(){
 function updateCargo(){
   const c=L.cargo;if(c.lock>0)c.lock--;
   if(!c.carried && !c.delivered && !c.lock && Math.abs(player.x+player.w/2-c.x)<30 && Math.abs(player.y+player.h/2-c.y)<48){
-    c.carried=true;snd('crate');popups.push({x:c.x,y:c.y,t:90,txt:'CARGO SECURED'});
+    c.carried=true;if(gameMode==='campaign')L.delivery.locked=true;snd('crate');popups.push({x:c.x,y:c.y,t:90,txt:'CARGO SECURED'});
   }
 }
 function dropCargo(z){
@@ -857,12 +940,12 @@ function startDaily(day){
   const d=dailyContract(day);activeRun={...d,finished:false,locked:false,result:''};
   newGame(d.stage,'daily');selectWeapon(d.weapon);activeRun.locked=true;
   document.getElementById('bWeapon').textContent=WEAPONS[d.weapon].name+' · DAILY LOCKED';
-  L.pickups=[];L.boxPowers={};L.secrets={};L.sweepers=[];L.bonus=null;lives=1;frame=0;
+  L.pickups=[];L.boxPowers={};L.secrets={};L.sweepers=[];L.bonus=null;L.rescue=null;L.checkpoint=null;L.secretRoute=null;L.zs=L.zs.filter(z=>!z.miniBoss);lives=1;frame=0;
 }
 function buildArena(){
   const level=buildLevel(0);level.W=25;level.grid=Array.from({length:ROWS},(_,y)=>Array.from({length:25},(_,x)=>y>=12?'#':x===0||x===24?'H':' '));
   level.flagX=-1;level.exitX=-1;level.zs=[];level.bolts=[];level.props=[];level.pickups=[];level.elements=[];
-  level.secrets={};level.sweepers=[];level.bonus=null;level.cargo.delivered=true;level.info.street='SURVIVAL ARENA';level.info.course={...COURSES[0],hint:'Clear waves. Heal one heart between waves.'};
+  level.secrets={};level.sweepers=[];level.bonus=null;level.rescue=null;level.checkpoint=null;level.secretRoute=null;level.cargo.delivered=true;level.info.street='SURVIVAL ARENA';level.info.course={...COURSES[0],hint:'Clear waves. Heal one heart between waves.'};
   return level;
 }
 function startSurvival(){
@@ -909,13 +992,17 @@ function modeStatus(){
 }
 function renderFieldGuide(){
   const entries=[
+    ['Delivery adventures','G / CARGO selects Standard, Fragile (+20 coins), Explosive (+25) or Medical (+15 and heal) before pickup. Fragile cargo breaks after one hit; others have three integrity. Medical cargo heals one heart every ten active seconds while intact and carried. Actual damage reduces integrity. Explosive cargo bursts once around you when hit, without extra self damage. A broken specialty delivery still clears but earns no specialty bonus.'],
+    ['Rescue and checkpoints','Contact a survivor to escort them along your recent path. Three shared damage strikes lose the escort; delivery grants 30 coins. A midway flag saves your location for life-loss respawns, retaining opened boxes, defeated enemies, time and rewards. Checkpoint use prevents a new speed medal. R fully restarts.'],
+    ['Secret routes','On eligible stages, climb the stepped rooftop for a 12-coin cache, or use T / TUNNEL at a marked hatch for an instant forward tunnel shortcut and 8 coins. Optional; once per attempt.'],
+    ['Swamp Crawler','Optional 16-health mini-boss on eligible third stages of a route. A charge warning precedes a low ground wave; jump over it. Stomps deal three damage. Defeating it grants 20 coins.'],
     ['Dash','V or touch DASH: short horizontal burst, 1.25-second recharge. One airborne dash per landing. No invulnerability; walls stop it.'],
     ['Ring run and secrets','Campaign only: collect three purple rings in order within ten seconds of the first for 15 coins and 1500 score. Star-marked existing bricks hide 10 coins and 1000 score. Optional; reset on retry.'],
     ['Sweep beam','Gold floor marker warns before a low red beam. Jump over it; it does not block movement.'],
     ['Charger monster','Horned undead with orange shoulder pads. Exclamation warns for 0.75 seconds, then it rushes straight ahead and recovers for one second. Jump over, flank or stagger with shots.'],
     ['Walker','Slow pursuer. Shoot or stomp; keep distance to manage heat.'],
     ['Runner','Closes distance quickly. Jump over or use Cryo to slow it.'],
-    ['Brute monster','Horned undead heavy. Heavy target with seven health; stomps deal three damage. Railgun and Plasma are effective.'],
+    ['Brute monster','Horned undead heavy target with seven health; stomps deal three damage. Railgun and Plasma are effective.'],
     ['Shield zombie','Blue shield blocks one frontal hit, then opens for 45 ticks. Follow up, flank or stomp.'],
     ['Cargo thief','Gold-marked, fast enemy. Contact knocks cargo onto visible open street for recovery.'],
     ...WEAPONS.slice(6).map(w=>[w.name,w.desc+' Select with '+(WEAPONS.indexOf(w)+1)+', Q/E or the free store loadout.']),
@@ -1171,6 +1258,8 @@ function gore(x, y, n, col){
 }
 function killZombie(z, dirSign){
   if (z.dead) return;
+  z.deathKind=z.type==='crawler'?'crumble':z.type==='leaper'?'dissolve':'fall';
+  if(z.miniBoss){earnCoins(20);popups.push({x:z.x,y:z.y-20,t:120,txt:'SWAMP CRAWLER DEFEATED · +20 COINS'});}
   z.dead = true; z.vy = -6; z.vx = 2 * (dirSign || 1); snd('zdie'); if (z.active) zombieSay(z, true);
   if(effects.vampire>0 && ++vampireKills%3===0)player.health=Math.min(maxHealth(),player.health+1);
   player.streak=player.streakTicks>0?player.streak+1:1;player.streakTicks=180;
@@ -1183,7 +1272,8 @@ function hurtPlayer(srcX){
   if (p.inv > 0 || effects.shield>0 || state!=='play') return;
   if(effects.barrier>0){effects.barrier=0;p.inv=45;snd('bump');popups.push({x:p.x,y:p.y-12,t:50,txt:'WARD BLOCK'});return;}
   p.dashTicks=0;p.streak=0;p.streakTicks=0;
-  p.health--; p.inv = 100; p.hurtFlash=12; shake = 8;
+  p.health--;const fatal=p.health<=0;hurtDelivery();if(fatal)p.health=0;
+  p.inv = 100; p.hurtFlash=12; shake = 8;
   if (L.boss && !L.boss.dead && Math.random() < .35) bossSay(1 + Math.floor(Math.random()*2));
   p.vx = (p.x + p.w/2 < srcX ? -5 : 5); p.vy = -6;
   snd('hurt'); gore(p.x+p.w/2, p.y+20, 6, '#b01818');
@@ -1329,6 +1419,13 @@ function updateBoss(){
     } else hurtPlayer(B.x + B.w/2);
   }
 }
+function pushEnemy(z,amount){
+  const steps=Math.max(1,Math.ceil(Math.abs(amount)));
+  for(let i=0;i<steps;i++){const next=z.x+amount/steps,tx=Math.floor((amount>0?next+z.w-.001:next)/T);
+    if(Array.from({length:Math.ceil(z.h/T)+1},(_,j)=>Math.floor(z.y/T)+j).some(ty=>ty*T<z.y+z.h && solidAt(tx,ty)))break;
+    z.x=next;
+  }
+}
 function registerHit(x,y,damage){
   player.hitMark=9;player.hitX=x;player.hitY=y;
   parts.push({kind:'impact',x,y,t:8});
@@ -1360,7 +1457,7 @@ function update(){
     if (--stateTimer<=0){
       if(gameMode!=='campaign'){finishMode(false);return;}
       lives--; saveBest();
-      if (lives<=0){ state='gameover'; snd('gameover'); startPick = Math.floor(levelIdx/5)*5; } else startLevel(levelIdx);
+      if (lives<=0){ state='gameover'; snd('gameover'); startPick = Math.floor(levelIdx/5)*5; } else if(!resumeCheckpoint())startLevel(levelIdx);
     }
     return;
   }
@@ -1479,7 +1576,7 @@ function update(){
     if (!z.active && z.x < cam + VW + 40){ z.active = true; if (Math.abs(z.x - player.x) < 750 && Math.random() < .45 && zombieSay(z)) {} else if (Math.random()<.4) snd('groan'); }
     if (!z.active) continue;
     if (z.flash>0) z.flash--;
-    if (z.dead){ z.vy += .5; z.y += z.vy; z.x += z.vx; if (z.y > VH+80) z.alive = false; continue; }
+    if (z.dead){ z.deathT=(z.deathT||0)+1;if(z.deathKind==='dissolve' && frame%3===0)parts.push({kind:'gore',x:z.x+z.w/2,y:z.y+z.h/2,vx:0,vy:-1,t:20,c:'#31bcb7'});z.vy += .5; z.y += z.vy; z.x += z.vx; if (z.y > VH+80) z.alive = false; continue; }
     if(effects.freeze>0) continue;
     const staggered=z.stagger>0;if(staggered)z.stagger--;
     const dx = (p.x + p.w/2) - (z.x + z.w/2);
@@ -1499,23 +1596,23 @@ function update(){
       }
       parts.push({kind:'frostpulse',x:z.x+z.w/2,y:z.y+20,r:160,t:20});z.attack=180;
     }
-    if(z.type==='charger' && !staggered){
+    if((z.type==='charger'||z.type==='crawler') && !staggered){
       if(z.chargeState==='stalk' && Math.abs(dx)<300 && z.onGround && clearShot(z.x+15,z.y+20,p.x+12,p.y+20)){
         z.chargeState='warn';z.chargeTicks=45;z.chargeDir=dx<0?-1:1;
       }else if(z.chargeState!=='stalk' && --z.chargeTicks<=0){
-        if(z.chargeState==='warn'){z.chargeState='rush';z.chargeTicks=30;}
+        if(z.chargeState==='warn'){z.chargeState='rush';z.chargeTicks=30;if(z.miniBoss)spits.push({x:z.x+z.w/2,y:GROUND-10,vx:z.chargeDir*5,wave:true,t:90});}
         else if(z.chargeState==='rush'){z.chargeState='recover';z.chargeTicks=60;}
         else z.chargeState='stalk';
       }
     }
-    if(z.type==='charger' && z.chargeState!=='stalk')z.dir=z.chargeDir;
-    const chargeSpeed=z.type==='charger' && z.chargeState!=='stalk'?(z.chargeState==='rush'?5:0):null;
+    if((z.type==='charger'||z.type==='crawler') && z.chargeState!=='stalk')z.dir=z.chargeDir;
+    const chargeSpeed=(z.type==='charger'||z.type==='crawler') && z.chargeState!=='stalk'?(z.chargeState==='rush'?5:0):null;
     const sp = chargeSpeed!==null?chargeSpeed*(z.slow>0?.35:1):(z.type==='leaper' && z.onGround && z.attack<30?0:1)*(z.slow>0?.35:1)*(z.type==='runner' && Math.abs(dx) > 260 ? z.speed*.5 : z.speed);
     z.vx = staggered?0:z.dir * sp;
     z.vy = Math.min(z.vy + .6, 10);
     moveBody(z);
-    if(z.type==='charger' && z.hitWall && z.chargeState==='rush'){z.chargeState='recover';z.chargeTicks=60;}
-    if (z.hitWall && z.onGround && z.type!=='charger'){ z.vy = z.type==='runner' ? -9 : -7; }
+    if((z.type==='charger'||z.type==='crawler') && z.hitWall && z.chargeState==='rush'){z.chargeState='recover';z.chargeTicks=60;}
+    if (z.hitWall && z.onGround && z.type!=='charger' && z.type!=='crawler'){ z.vy = z.type==='runner' ? -9 : -7; }
     z.anim += sp * .12;
     if (z.y > VH+60){ z.alive=false; continue; }
     if (z.x < cam - 160) { z.alive=false; continue; }
@@ -1523,7 +1620,7 @@ function update(){
       const fromAbove = p.vy > 0 && (p.y + p.h) - z.y < 20;
       if (fromAbove){
         p.vy = jumpHeld() ? -11 : -7; snd('stomp');
-        if (z.type==='brute'){ z.hp -= 3; z.flash = 5; if (z.hp<=0) killZombie(z, p.face); else addScore(100, z.x+z.w/2, z.y); }
+        if (z.type==='brute' || z.miniBoss){ z.hp -= 3; z.flash = 5; if (z.hp<=0) killZombie(z, p.face); else addScore(100, z.x+z.w/2, z.y); }
         else { combo++; const pts = [100,200,400,800,1000,2000][Math.min(combo-1,5)]; z.pts = pts; combo--; killZombie(z, p.face); }
       } else {if(z.type==='thief' && p.inv<=0 && L.cargo.carried)dropCargo(z);hurtPlayer(z.x + z.w/2);}
     }
@@ -1553,11 +1650,12 @@ function update(){
         if (b.x > z.x && b.x < z.x + z.w && b.y > z.y && b.y < z.y + z.h){
           if(b.blast){detonate(b);break;}
           if(z.type==='shield' && !z.guardBreak && Math.sign(b.vx)===-z.dir){
-            z.guardBreak=45;b.life=0;parts.push({kind:'spark',x:b.x,y:b.y,t:8});snd('bump');break;
+            z.guardBreak=45;parts.push({kind:'armorbreak',x:z.x+z.w/2,y:z.y+20,vx:Math.sign(b.vx)*2,vy:-3,t:30});b.life=0;parts.push({kind:'spark',x:b.x,y:b.y,t:8});snd('bump');break;
           }
-          registerHit(b.x,b.y,b.dmg*(z.type==='plated' && b.pierce<=0?.5:1));z.stagger=6;
+          registerHit(b.x,b.y,b.dmg*(z.type==='plated' && !z.armorCracked && b.pierce<=0?.5:1));z.stagger=6;
+          if(z.type==='plated' && b.pierce>0 && !z.armorCracked){z.armorCracked=true;parts.push({kind:'armorbreak',x:z.x+z.w/2,y:z.y+20,vx:Math.sign(b.vx)*2,vy:-3,t:30});}
           if(b.slow)z.slow=180;
-          z.hp -= b.dmg*(z.type==='plated' && b.pierce<=0?.5:1); z.flash = 4; b.hit.add(z); z.x += Math.sign(b.vx) * (z.type==='brute' ? .8 : 2.5);
+          z.hp -= b.dmg*(z.type==='plated' && !z.armorCracked && b.pierce<=0?.5:1); z.flash = 4; b.hit.add(z); pushEnemy(z,Math.sign(b.vx)*(z.type==='brute'||z.miniBoss ? .8 : 4));
           gore(b.x, b.y, 2);
           if (z.hp <= 0) killZombie(z, Math.sign(b.vx)); else snd('zhit');
           if (b.pierce-- <= 0){ b.life = 0; break; }
@@ -1664,7 +1762,7 @@ function updateFx(){
   popups = popups.filter(q=>q.t>0).slice(-80);
   for (const q of parts){
     q.t--;
-    if (q.kind==='brick' || q.kind==='gore' || q.kind==='shell'){ q.vy += .45; q.x += q.vx; q.y += q.vy; if (q.kind==='gore' && q.y > GROUND && solidAt(Math.floor(q.x/T),12)) { q.y = GROUND; q.vx = 0; q.vy = 0; } }
+    if (q.kind==='brick' || q.kind==='gore' || q.kind==='shell' || q.kind==='armorbreak'){ q.vy += .45; q.x += q.vx; q.y += q.vy; if (q.kind==='gore' && q.y > GROUND && solidAt(Math.floor(q.x/T),12)) { q.y = GROUND; q.vx = 0; q.vy = 0; } }
     else if(q.kind==='confetti'){q.x+=q.vx;q.y+=q.vy;q.vy+=.12;q.spin+=.15;}
     else if (q.kind==='puff'){ q.x += q.vx; q.y += q.vy; }
     else if (q.kind==='boltpop' || q.kind==='medpop' || q.kind==='powerpop'){ q.vy += .55; q.y += q.vy; }
@@ -1677,6 +1775,7 @@ function updateFx(){
 
 function updateAdventure(){
   if(gameMode!=='campaign')return;
+  updateDelivery();
   const p=player,b=L.bonus;
   for(const e of L.sweepers||[]){const phase=(frame+e.phase)%240;
     if(phase>=180 && phase<215 && p.x<e.x+e.w && p.x+p.w>e.x && p.y+p.h>GROUND-20 && p.y<GROUND)hurtPlayer(e.x+e.w/2);
@@ -1693,6 +1792,10 @@ function drawAdventure(){
   if(!['play','pause','clear','dying'].includes(state))return;
   cx.save();cx.translate(-cam,0);
   if(gameMode==='campaign'){
+    const checkpoint=L.checkpoint,rescue=L.rescue,route=L.secretRoute;
+    if(checkpoint){cx.fillStyle=checkpoint.active?'#78d6a0':'#8c9ba5';cx.fillRect(checkpoint.x,GROUND-62,4,62);cx.fillRect(checkpoint.x+4,GROUND-62,24,16);sh('CHECKPOINT',checkpoint.x,GROUND-78,'#b7f6e9',7,'center');}
+    if(rescue && !rescue.lost && !rescue.delivered){cx.fillStyle='#e9bc92';cx.fillRect(rescue.x+5,rescue.y,10,10);cx.fillStyle='#ffd25d';cx.fillRect(rescue.x+2,rescue.y+10,16,24);cx.fillStyle='#26394f';cx.fillRect(rescue.x+2,rescue.y+34,6,10);cx.fillRect(rescue.x+12,rescue.y+34,6,10);sh(rescue.following?'ESCORT '+rescue.health+'/3':'HELP!',rescue.x+10,rescue.y-14,'#ffe08a',8,'center');}
+    if(route){sh(route.kind==='rooftop'?'SECRET ROOFTOP':'TUNNEL [T]',route.x,GROUND-95,'#c58bff',8,'center');if(route.kind==='tunnel'){for(const x of [route.x,route.exit]){cx.fillStyle='#24313b';cx.fillRect(x-14,GROUND-10,28,10);cx.strokeStyle='#c58bff';cx.strokeRect(x-16,GROUND-12,32,12);}}else if(!route.claimed){cx.fillStyle='#ffd25d';cx.fillRect(route.x+3*T-10,7*T-22,20,20);}}
     const b=L.bonus;
     if(b && !b.failed)for(const r of b.rings)if(!r.got){
       cx.strokeStyle='#c58bff';cx.lineWidth=4;cx.beginPath();cx.ellipse(r.x,r.y,13,20,0,0,Math.PI*2);cx.stroke();
@@ -1706,7 +1809,9 @@ function drawAdventure(){
     for(const key of Object.keys(L.secrets||{})){const [x,y]=key.split(',').map(Number);sh('*',x*T+16,y*T+10,'#ffe08a',10,'center');}
   }
   for(const q of popups)sh(q.txt,q.x,q.y,q.damage?'#ffe08a':'#fff',q.damage?9:10,'center');
-  for(const z of L.zs)if(z.alive && z.active && !z.dead && z.type==='charger')sh(z.chargeState==='warn'?'!':z.chargeState==='rush'?'>>':'V',z.x+z.w/2,z.y-20,'#ff9b54',14,'center');
+  for(const z of L.zs)if(z.alive && z.active && !z.dead && z.miniBoss)sh('SWAMP CRAWLER '+Math.ceil(z.hp)+'/16',z.x+z.w/2,z.y-34,'#ff9b54',8,'center');
+  for(const z of L.zs)if(z.alive && z.active && !z.dead && (z.type==='charger'||z.type==='crawler'))sh(z.chargeState==='warn'?'!':z.chargeState==='rush'?'>>':'V',z.x+z.w/2,z.y-20,'#ff9b54',14,'center');
+  for(const q of parts)if(q.kind==='armorbreak'){cx.fillStyle='#bac5d1';cx.fillRect(q.x,q.y,6,5);}
   for(const q of parts)if(q.kind==='impact'||q.kind==='dash'){
     cx.strokeStyle=q.kind==='dash'?'#7cfff0':'#fff3b0';cx.lineWidth=2;cx.beginPath();
     const r=(10-q.t)*2+3;cx.moveTo(q.x-r,q.y);cx.lineTo(q.x+r,q.y);cx.moveTo(q.x,q.y-r);cx.lineTo(q.x,q.y+r);cx.stroke();
@@ -2130,7 +2235,7 @@ function drawLevel(){
     else { cx.fillStyle = '#7fd13b'; cx.beginPath(); cx.arc(s.x, s.y, 7, 0, 7); cx.fill(); cx.fillStyle = '#c8ff8a'; cx.beginPath(); cx.arc(s.x-2, s.y-2, 3, 0, 7); cx.fill(); }
   }
   for (const q of parts){
-    if(q.kind==='impact'||q.kind==='dash')continue;
+    if(q.kind==='impact'||q.kind==='dash'||q.kind==='armorbreak')continue;
     if (q.kind==='brick'){ cx.fillStyle='#a8503a'; cx.fillRect(q.x-6,q.y-6,12,12); }
     else if (q.kind==='gore'){ cx.fillStyle = q.c; cx.fillRect(q.x-2, q.y-2, 4, 4); }
     else if (q.kind==='shell'){ cx.fillStyle = '#d4a017'; cx.fillRect(q.x, q.y, 4, 2); }
@@ -2202,6 +2307,8 @@ function drawZombie(z){
   const s = z.type==='brute' ? 1.4 : 1;
   const face = z.dir;
   cx.save(); cx.translate(z.x + z.w/2, z.y + z.h);
+  if(z.dead && z.deathKind==='dissolve')cx.globalAlpha=Math.max(0,1-(z.deathT||0)/30);
+  if(z.dead && z.deathKind==='crumble')cx.scale(1.2,Math.max(.2,1-(z.deathT||0)/30));
   if (z.dead){ cx.rotate(z.vx * .25 * (z.vy+6) * .1); }
   cx.scale(face * s, s);
   const W = z.flash > 0;
@@ -2252,7 +2359,7 @@ function drawZombie(z){
     cx.fillStyle='#86a46e';cx.fillRect(z.x+z.w*.3,z.y+z.h*.43,z.w*.4,12);
     cx.fillStyle='#d8d4ca';for(let j=0;j<3;j++)cx.fillRect(z.x+z.w*.32,z.y+z.h*.45+j*4,z.w*.36,1);
     for(const dy of [0,3,6])cx.fillRect(z.x+z.w/2+z.dir*17,z.y+z.h*.52+dy,6,1);
-    if(['brute','charger','leaper'].includes(z.type)){
+    if(['brute','charger','leaper','crawler'].includes(z.type)){
       cx.fillStyle='#d8d4ca';
       for(const side of [-1,1]){const x=z.x+z.w/2+side*z.w*.3;cx.beginPath();cx.moveTo(x-3,z.y+5);cx.lineTo(x+side*3,z.y-7);cx.lineTo(x+3,z.y+5);cx.fill();}
       cx.fillRect(z.x+z.w/2-5,z.y+17,2,5);cx.fillRect(z.x+z.w/2+4,z.y+17,2,5);
@@ -2262,9 +2369,10 @@ function drawZombie(z){
     cx.fillStyle='#4b2928';cx.fillRect(z.x+z.w/2+3,z.y+9,2,6);
     for(let j=0;j<3;j++){cx.fillStyle='#20302b';cx.fillRect(z.x+8+j*4,z.y+z.h*.48+j*2,2,6);}
     if(z.type==='shield'){cx.fillStyle=z.guardBreak>0?'#666':'#6ec4e8';cx.fillRect(z.x+z.w/2+z.dir*16-4,z.y+14,8,30);}
-    if(z.type==='charger'){cx.fillStyle='#ff9b54';cx.fillRect(z.x-2,z.y+14,10,14);cx.fillRect(z.x+z.w-8,z.y+14,10,14);}
+    if((z.type==='charger'||z.type==='crawler')){cx.fillStyle='#ff9b54';cx.fillRect(z.x-2,z.y+14,10,14);cx.fillRect(z.x+z.w-8,z.y+14,10,14);}
+    if(z.miniBoss){cx.strokeStyle='#86a46e';cx.lineWidth=4;for(let i=0;i<3;i++){cx.beginPath();cx.moveTo(z.x+z.w/2,z.y+12+i*5);cx.lineTo(z.x-8,z.y+z.h-i*3);cx.moveTo(z.x+z.w/2,z.y+12+i*5);cx.lineTo(z.x+z.w+8,z.y+z.h-i*3);cx.stroke();}}
     if(z.type==='thrower')sh('LOB',z.x+z.w/2,z.y-12,'#ffab65',7,'center');
-    if(z.type==='plated'){cx.fillStyle='#bac5d1';cx.fillRect(z.x+4,z.y+15,z.w-8,20);sh('ARMOR',z.x+z.w/2,z.y-20,'#d9e4ef',6,'center');}
+    if(z.type==='plated' && !z.armorCracked){cx.fillStyle='#bac5d1';cx.fillRect(z.x+4,z.y+15,z.w-8,20);sh('ARMOR',z.x+z.w/2,z.y-20,'#d9e4ef',6,'center');}
     if(z.type==='medic'){cx.fillStyle='#fff';cx.fillRect(z.x+4,z.y+15,18,18);cx.fillStyle='#ff675f';cx.fillRect(z.x+11,z.y+17,4,14);cx.fillRect(z.x+6,z.y+22,14,4);sh(z.attack<30?'HEAL!':'MEDIC',z.x+z.w/2,z.y-20,'#9fffba',6,'center');}
     if(z.type==='leaper'){cx.fillStyle='#ffab65';cx.fillRect(z.x+2,z.y+z.h-14,z.w-4,9);sh(z.attack<30?'JUMP!':'LEAPER',z.x+z.w/2,z.y-20,'#ffab65',6,'center');}
     if(z.type==='thief')sh('THIEF',z.x+z.w/2,z.y-12,'#ffe08a',7,'center');
@@ -2429,6 +2537,7 @@ function drawHUD(){
   active.forEach((item,i)=>sh(item.name.toUpperCase()+' '+Math.ceil(effects[item.id]/60)+'s',18+Math.floor(i/6)*250,88+(i%6)*13,'#9fffba',8));
   if(effects.barrier>0){sh('WARD READY',650,88,'#a0fff2',8);}
   if(player.overheat)sh('COOLING '+Math.ceil(Math.max(0,player.heat-35)/1.1/60)+'s',650,100,'#ffab65',8);
+  if(gameMode==='campaign'){const d=L.delivery;sh('CONTRACT '+d.kind.toUpperCase()+(d.kind==='standard'?'':' · '+d.integrity+'/'+(d.kind==='fragile'?1:3)),400,108,'#ffe08a',8,'center');}
   sh('DASH [V] '+(player.dashCd>0?(player.dashCd/60).toFixed(1)+'s':'READY'),18,188,'#7cfff0',8);
   if(player.streakTicks>0 && player.streak>1)sh(player.streak+' KILL STREAK',18,202,'#ffe08a',8);
   if(gameMode==='campaign' && L.bonus){const b=L.bonus;sh(b.done?'RING RUN COMPLETE':b.failed?'RING RUN MISSED':'RINGS '+b.rings.filter(r=>r.got).length+'/3 · '+(b.started?(b.ticks/60).toFixed(1)+'s':'10s BONUS'),400,88,'#d8b7ff',8,'center');}
@@ -2555,6 +2664,9 @@ function loop(now){
     const x=player.x-cam-25,y=player.y-26+Math.sin(frame*.08)*4;cx.fillStyle=cosmetic('drone').color;cx.fillRect(x-8,y-5,16,10);cx.fillStyle='#fff';cx.fillRect(x-16,y-9,12,2);cx.fillRect(x+4,y-9,12,2);
   }
   drawAdventure(); drawHUD(); drawScreens();
+  const contractButton=document.getElementById('bContract'),routeButton=document.getElementById('bRoute');
+  contractButton.hidden=gameMode!=='campaign'||!['play','pause'].includes(state);contractButton.textContent='CARGO: '+L.delivery.kind.toUpperCase()+' [G]';contractButton.disabled=!!L.delivery.locked||state!=='play';
+  const route=L.secretRoute;routeButton.hidden=gameMode!=='campaign'||state!=='play'||!route||route.kind!=='tunnel'||route.claimed||Math.abs(player.x-route.x)>48;
   document.getElementById('bPause').textContent=state==='pause'?'RESUME [P]':'PAUSE [P]';
   document.getElementById('courseStatus').textContent=state==='play' || state==='pause' ? L.info.course.name+' · '+L.info.course.hint : '';
   document.getElementById('missionStatus').textContent=gameMode!=='campaign'?modeStatus():['play','pause','clear','intro'].includes(state)?'CARGO: '+(L.cargo.delivered?'DELIVERED':L.cargo.carried?'SECURED · reach the exit':'find the gold crate')+' · '+(L.runTicks/60).toFixed(1)+'s / '+(targetTicks()/60)+'s speed target'+(state==='clear'?' · '+medalCount()+'/300 medals':''):'';

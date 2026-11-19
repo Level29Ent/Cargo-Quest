@@ -9,8 +9,8 @@ function el(){return {set width(v){this._width=v;drawing.imageSmoothingEnabled=t
 const listeners={};
 const sandbox={console,Math,Set,Image:function(){},innerWidth:390,innerHeight:844,performance:{now:()=>0},requestAnimationFrame(){},setTimeout(){},addEventListener(name,fn){listeners[name]=fn;},document:{getElementById:id=>nodes[id]??=el(),createElement:()=>el(),createTextNode:text=>({textContent:text}),querySelectorAll:()=>[],addEventListener(name,fn){listeners[name]=fn;}},localStorage:{getItem:k=>store[k]??null,setItem:(k,v)=>store[k]=v}};
 sandbox.window=sandbox;
-src=src.replace('window.__game =',`window.test={updateAdventure,drawAdventure,registerHit,hitBlock,buildLevel,moveBody,newGame,update,openShop,closeShop,purchasePower,earnCoins,addBolt,killZombie,hurtPlayer,fire,spawnBoss,SHOP_POWERS,WEAPONS,selectWeapon,grantPower,COURSES,fit,drawHUD,togglePause,releaseControls,finishStage,updateCargo,dropCargo,equipCosmetic,medalCount,loadCampaign,saveCampaign,updateBoss,targetTicks,openCampaign,closeCampaign,startDaily,startSurvival,dailyContract,finishMode,retryMode,spawnWave,updateSurvival,loadModeRecords,renderFieldGuide,modeStatus,drawScreens,startLevel,drawLevel,drawKingCake,makeZombie,detonate,clearShot,startCelebration,updateClear,loop,
-get score(){return score},get popups(){return popups},get clearPhase(){return clearPhase},get gameMode(){return gameMode},get activeRun(){return activeRun},get modeRecords(){return modeRecords},
+src=src.replace('window.__game =',`window.test={cycleContract,useTunnel,resumeCheckpoint,hurtDelivery,updateDelivery,finishDelivery,pushEnemy,killPlayer,updateAdventure,drawAdventure,registerHit,hitBlock,buildLevel,moveBody,newGame,update,openShop,closeShop,purchasePower,earnCoins,addBolt,killZombie,hurtPlayer,fire,spawnBoss,SHOP_POWERS,WEAPONS,selectWeapon,grantPower,COURSES,fit,drawHUD,togglePause,releaseControls,finishStage,updateCargo,dropCargo,equipCosmetic,medalCount,loadCampaign,saveCampaign,updateBoss,targetTicks,openCampaign,closeCampaign,startDaily,startSurvival,dailyContract,finishMode,retryMode,spawnWave,updateSurvival,loadModeRecords,renderFieldGuide,modeStatus,drawScreens,startLevel,drawLevel,drawKingCake,makeZombie,detonate,clearShot,startCelebration,updateClear,loop,
+get lives(){return lives},get cam(){return cam},get score(){return score},get popups(){return popups},get clearPhase(){return clearPhase},get gameMode(){return gameMode},get activeRun(){return activeRun},get modeRecords(){return modeRecords},
 get campaign(){return campaign},get cosmetics(){return COSMETICS},
 get parts(){return parts},
 get frame(){return frame},get weaponIndex(){return weaponIndex},set frame(v){frame=v},
@@ -59,14 +59,14 @@ const frozen=t.buildLevel(0).zs[0];Object.assign(frozen,{x:t.p.x+200,active:true
 const frozenX=frozen.x,frozenY=frozen.y;t.update();assert.equal(frozen.x,frozenX);assert.equal(frozen.y,frozenY);
 const coins=t.wallet;t.newGame(0);assert.equal(t.wallet,coins);assert.equal(Object.keys(t.effects).length,0);assert.equal(Number(store['cargoQuest2.coins']),coins);
 // Reproduce a six-tile-high entry with the real collision/jump update, then compare fixed geometry.
-function canLand(level,x,startFeet,targetY){
+function canLand(level,x,startFeet,targetY,holdFrames=90){
  t.L=level;t.state='play';level.zs=[];level.bolts=[];level.flagX=-1;level.info.isBoss=false;
  const p=t.p;Object.assign(p,{x:x*32-65,y:startFeet-60,vx:3.6,vy:0,onGround:true,coyote:6,health:3,inv:9999});
  t.touch.R=true;t.touch.J=true;t.jump();
- for(let f=0;f<90;f++){if(startFeet===targetY && f===8)t.touch.J=false;t.update();if(p.onGround && p.x+p.w>x*32 && Math.abs(p.y+p.h-targetY)<1){t.touch.R=false;t.touch.J=false;return true;}if(t.state!=='play')break;}
+ for(let f=0;f<90;f++){if((startFeet===targetY && f===8)||f===holdFrames)t.touch.J=false;t.update();if(p.onGround && p.x+p.w>x*32 && Math.abs(p.y+p.h-targetY)<1){t.touch.R=false;t.touch.J=false;return true;}if(t.state!=='play')break;}
  t.touch.R=false;t.touch.J=false;return false;
 }
-function fixture(row){const grid=Array.from({length:14},()=>Array(50).fill(' '));for(let x=0;x<50;x++){grid[12][x]='#';grid[13][x]='#';}for(let x=15;x<26;x++){grid[12][x]=' ';grid[13][x]=' ';}for(let x=15;x<18;x++)grid[row][x]='=';return {grid,W:50,zs:[],bolts:[],props:[],info:{...t.buildLevel(0).info},i:0,flagX:-1,runTicks:0,cargo:{x:300,y:366,carried:false,delivered:false,lock:0}};}
+function fixture(row){const grid=Array.from({length:14},()=>Array(50).fill(' '));for(let x=0;x<50;x++){grid[12][x]='#';grid[13][x]='#';}for(let x=15;x<26;x++){grid[12][x]=' ';grid[13][x]=' ';}for(let x=15;x<18;x++)grid[row][x]='=';return {delivery:{kind:'standard',integrity:3,paid:false},grid,W:50,zs:[],bolts:[],props:[],info:{...t.buildLevel(0).info},i:0,flagX:-1,runTicks:0,cargo:{x:300,y:366,carried:false,delivered:false,lock:0}};}
 t.newGame(0);assert.equal(canLand(fixture(6),15,384,192),false,'old high platform must reproduce failure');
 t.newGame(0);assert.equal(canLand(fixture(9),15,384,288),true,'fixed entry must be reachable without powers or sprint');
 // Boots produce a higher apex, with identical held-jump inputs.
@@ -163,12 +163,12 @@ cleanRun();const hitEnemy={alive:true,active:true,dead:false,flash:0,x:155,y:324
 cleanRun();t.hurtPlayer(t.p.x+100);assert.equal(t.p.hurtFlash,12);assert.equal(t.p.health,2);
 cleanRun();t.p.onGround=false;t.p.y=315;t.p.vy=9;t.update();assert.ok(t.parts.some(part=>part.kind==='puff'),'landing dust emitted');
 let platforms=0, crossings=0;
-for(let i=0;i<100;i++){const l=t.buildLevel(i);if(l.info.isBoss)continue;for(let x=0;x<l.W;x++)for(let y=0;y<14;y++)if(l.grid[y][x]==='='){assert.equal(y,9);platforms++;}}
+for(let i=0;i<100;i++){const l=t.buildLevel(i);if(l.info.isBoss)continue;for(let x=0;x<l.W;x++)for(let y=0;y<14;y++)if(l.grid[y][x]==='='){if(y!==9){assert.equal(y,7);assert.equal(l.secretRoute?.kind,'rooftop');assert.ok(x*32>=l.secretRoute.x && x*32<l.secretRoute.exit);}platforms++;}}
 assert.ok(platforms>100);
 for(let i=0;i<100;i++){
  const l=t.buildLevel(i);if(l.info.isBoss)continue;
  for(let x=1;x<l.W-3;x++){
-  if(l.grid[9][x]!=='=' || l.grid[9][x-1]==='=') continue;
+  if(l.grid[9][x]!=='=' || l.grid[9][x-1]==='=' || (l.secretRoute?.kind==='rooftop' && x*32>=l.secretRoute.x && x*32<=l.secretRoute.exit)) continue;
   const fromStreet=l.grid[12][x-1]==='#';
   // Every generated entry and subsequent one-tile platform gap is traversable at walking speed.
   t.newGame(0);
@@ -534,6 +534,72 @@ audit('optional content stays on intact street, out of exits, and retains origin
   t.newGame(i);t.state='play';t.drawAdventure();
  }
  assert.ok(rings>40);assert.ok(beams>40);assert.ok(secrets>20);assert.ok(chargers>0);
+});
+audit('cargo contracts lock at pickup, respond only to damage and award specialty delivery once',()=>{
+ for(const kind of ['standard','fragile','explosive','medical']){
+  combatRoom();while(t.L.delivery.kind!==kind)t.cycleContract();const d=t.L.delivery;
+  t.L.cargo.x=t.p.x+12;t.L.cargo.y=t.p.y+30;t.updateCargo();assert.equal(d.locked,true);assert.equal(t.cycleContract(),false);
+  t.p.inv=60;t.hurtPlayer(200);assert.equal(d.integrity,kind==='fragile'?1:3,'invulnerability cannot damage cargo');
+  const wallet=t.wallet;t.p.health=1;t.finishDelivery();const expected=kind==='standard'?0:kind==='fragile'?20:kind==='explosive'?25:15;
+  assert.equal(t.wallet,wallet+expected);t.finishDelivery();assert.equal(t.wallet,wallet+expected,'single-use specialty reward');if(kind==='medical')assert.equal(t.p.health,3);
+ }
+ combatRoom();t.L.delivery.kind='explosive';t.L.cargo.carried=true;const z=enemy('walker');z.x=150;t.L.zs=[z];t.p.inv=0;t.hurtPlayer(200);assert.equal(t.L.delivery.integrity,2);assert.equal(t.L.delivery.burst,true);assert.equal(z.hp,15);assert.equal(t.p.health,2,'burst adds no extra self damage');
+ t.p.inv=0;t.hurtPlayer(200);assert.equal(z.hp,15,'explosion occurs once');
+ combatRoom();t.L.delivery.kind='fragile';t.L.delivery.integrity=0;t.L.cargo.carried=true;const wallet=t.wallet;t.finishDelivery();assert.equal(t.wallet,wallet,'broken cargo grants no specialty bonus');
+});
+audit('medical cargo heals only while intact and explosive reactions cannot reverse fatal damage',()=>{
+ combatRoom();t.L.delivery.kind='medical';t.L.cargo.carried=true;t.p.health=1;t.L.runTicks=600;t.updateDelivery();assert.equal(t.p.health,2);
+ t.L.delivery.integrity=0;t.L.runTicks=1200;t.updateDelivery();assert.equal(t.p.health,2);
+ combatRoom();t.L.delivery.kind='explosive';t.L.cargo.carried=true;t.p.health=1;t.grantPower('vampire');
+ const targets=Array.from({length:3},(_,i)=>Object.assign(enemy('walker'),{x:145+i*10,hp:1}));t.L.zs=targets;t.hurtPlayer(200);assert.equal(t.state,'dying');assert.equal(t.p.health,0);
+});
+audit('survivor escort follows the player trail, takes shared hits and pays once at delivery',()=>{
+ combatRoom();t.L.rescue={x:100,y:324,w:20,h:44,health:3,following:false,delivered:false,lost:false,trail:[]};t.updateDelivery();assert.equal(t.L.rescue.following,true);
+ for(let i=0;i<60;i++){t.p.x+=2;t.updateDelivery();}assert.ok(t.L.rescue.x<t.p.x);assert.equal(t.L.rescue.trail.length,24);
+ t.p.inv=0;t.hurtPlayer(300);assert.equal(t.L.rescue.health,2);
+ const before=t.wallet;t.L.cargo.carried=false;t.finishDelivery();assert.equal(t.L.rescue.delivered,true);assert.equal(t.wallet,before+30);t.finishDelivery();assert.equal(t.wallet,before+30);
+ combatRoom();t.L.rescue={x:100,y:324,w:20,h:44,health:1,following:true,delivered:false,lost:false,trail:[]};t.hurtDelivery();assert.equal(t.L.rescue.lost,true);const wallet=t.wallet;t.finishDelivery();assert.equal(t.wallet,wallet);
+});
+audit('checkpoint life-loss respawn keeps opened boxes and rewards without granting speed medals',()=>{
+ combatRoom();t.L.checkpoint={x:800,y:324,active:false,used:false};t.p.x=800;t.updateDelivery();assert.equal(t.L.checkpoint.active,true);
+ t.L.grid[8][10]='U';t.L.delivery.kind='fragile';t.L.delivery.integrity=1;t.L.cargo.carried=true;
+ const level=t.L,coins=t.wallet,lives=t.lives;t.killPlayer();for(let i=0;i<150;i++)t.update();
+ assert.equal(t.L,level);assert.equal(t.lives,lives-1);assert.equal(t.p.x,800);assert.equal(t.L.grid[8][10],'U');assert.equal(t.L.delivery.integrity,1);assert.equal(t.wallet,coins);assert.equal(t.state,'play');assert.equal(t.L.checkpoint.used,true);assert.equal(t.p.health,3);
+ delete t.campaign.stages[0];t.L.runTicks=1;t.finishStage();assert.equal(t.campaign.stages[0].speed,false,'checkpoint recovery cannot award a new speed medal');
+ t.newGame(0);assert.ok(!t.L.checkpoint?.active,'full restart resets checkpoint');
+});
+audit('secret tunnel requires nearby interaction and awards only once; rooftop requires climbing',()=>{
+ combatRoom();t.L.secretRoute={kind:'tunnel',x:320,exit:736,claimed:false};const before=t.wallet;
+ assert.equal(t.useTunnel(),false);t.p.x=320;t.p.onGround=true;t.openShop();assert.equal(t.useTunnel(),false);t.closeShop();assert.equal(t.useTunnel(),true);assert.equal(t.p.x,736);assert.equal(t.wallet,before+8);assert.equal(t.useTunnel(),false);
+ combatRoom();t.L.secretRoute={kind:'rooftop',x:320,exit:736,claimed:false};t.p.x=320+3*32;t.p.y=324;const wallet=t.wallet;t.updateDelivery();assert.equal(t.wallet,wallet);t.p.y=7*32-t.p.h;t.p.onGround=true;t.updateDelivery();assert.equal(t.wallet,wallet+12);t.updateDelivery();assert.equal(t.wallet,wallet+12);
+});
+audit('mini-boss warns before a ground wave, survives a stomp, and rewards a single defeat',()=>{
+ combatRoom();const z=t.makeZombie(340,'crawler','nola',()=>.5);Object.assign(z,{active:true,onGround:true});t.L.zs=[z];t.update();assert.equal(z.chargeState,'warn');assert.equal(t.spits.length,0);for(let i=0;i<45;i++)t.update();assert.equal(z.chargeState,'rush');assert.ok(t.spits.some(s=>s.wave));
+ combatRoom();const boss=t.makeZombie(120,'crawler','nola',()=>.5);Object.assign(boss,{active:true,onGround:true});t.L.zs=[boss];Object.assign(t.p,{x:125,y:boss.y-t.p.h+5,vy:2,onGround:false});t.update();assert.equal(boss.hp,13);assert.equal(boss.dead,false);
+ const coins=t.wallet;t.killZombie(boss,1);t.killZombie(boss,1);assert.equal(t.wallet,coins+23);assert.equal(boss.deathKind,'crumble');
+});
+audit('enemy knockback stops at walls and piercing hits break plated armor',()=>{
+ combatRoom();const z=enemy('walker');z.x=130;z.y=324;t.L.grid[10][5]='H';t.L.grid[11][5]='H';t.pushEnemy(z,30);assert.ok(z.x+z.w<=160);assert.equal(z.y,324,'knockback never applies gravity twice');
+ combatRoom();const armor=enemy('plated');t.L.zs=[armor];t.selectWeapon(7);t.fire();t.update();assert.equal(armor.armorCracked,true);assert.ok(t.parts.some(p=>p.kind==='armorbreak'));t.drawAdventure();t.drawLevel();
+});
+audit('new delivery content stays out of extra modes and has safe campaign placements',()=>{
+ let escorts=0,checkpoints=0,roofs=0,tunnels=0,bosses=0;
+ for(let i=0;i<100;i++){
+  const l=t.buildLevel(i);if(l.rescue){escorts++;assert.equal(l.grid[12][Math.floor(l.rescue.x/32)],'#');}
+  if(l.checkpoint){checkpoints++;assert.equal(l.grid[12][l.checkpoint.x/32],'#');assert.ok(l.checkpoint.x/32<l.W-58);}
+  if(l.secretRoute){const r=l.secretRoute;if(r.kind==='rooftop')roofs++;else tunnels++;assert.equal(l.grid[12][r.exit/32],'#');assert.ok(r.exit/32<l.W-52);}
+  bosses+=l.zs.filter(z=>z.miniBoss).length;t.newGame(i);t.state='play';t.drawAdventure();t.drawHUD();
+ }
+ assert.ok(escorts>40);assert.ok(checkpoints>40);assert.ok(roofs>0);assert.ok(tunnels>0);assert.ok(bosses>0);
+ for(let i=0;i<100;i++){
+  const level=t.buildLevel(i),route=level.secretRoute;if(route?.kind!=='rooftop')continue;
+  t.newGame(0);const x=route.x/32;
+  assert.equal(canLand(level,x,384,288),true,'normal jump reaches first rooftop step '+i);
+  t.newGame(0);assert.equal(canLand(level,x+2,288,224,8),true,'normal jump reaches rooftop cache '+i);
+ }
+
+ t.startDaily('2026-11-19');assert.equal(t.L.rescue,null);assert.equal(t.L.checkpoint,null);assert.equal(t.L.secretRoute,null);assert.equal(t.cycleContract(),false);
+ t.startSurvival();assert.equal(t.L.rescue,null);assert.equal(t.L.checkpoint,null);assert.equal(t.L.secretRoute,null);assert.equal(t.resumeCheckpoint(),false);
 });
 if(auditFailures.length)throw Error('AUDIT FAILURES\n'+auditFailures.join('\n'));
 module.exports = { test: t };
