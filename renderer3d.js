@@ -126,11 +126,12 @@ try {
     orb(x2,y2,z,width,width,width,color);
   }
   function person(body, isPlayer, boss=false) {
+    if(body.dead && body.deathKind==='dissolve' && body.deathT>20)return;
     const x=body.x+body.w/2, feet=448-body.y-body.h;
-    const h=body.h, width=body.w, face=isPlayer?body.face:body.dir||body.face||-1;
+    const h=body.dead && body.deathKind==='crumble'?Math.max(10,body.h*.6):body.h, width=body.w, face=isPlayer?body.face:body.dir||body.face||-1;
     const gait=Math.sin(body.anim||0)*(body.onGround===false?2:7);
     const hurt=!isPlayer && body.flash>0;
-    const infectedSkin=body.type==='brute'?'#68816b':body.type==='runner'?'#a4b578':body.type==='leaper'?'teal':body.type==='charger'?'#68816b':'zombie';
+    const infectedSkin=body.type==='brute'||body.type==='crawler'?'#68816b':body.type==='runner'?'#a4b578':body.type==='leaper'?'teal':body.type==='charger'?'#68816b':'zombie';
     const skin=hurt?'white':isPlayer?'skin':infectedSkin;
     const color=hurt?'white':isPlayer?(window.__game.cosmetic?.outfit||'purple'):boss?'red':body.type==='runner'?'brick':body.type==='brute'?'dark':body.type==='medic'?'teal':body.type==='thief'?'purple':'boots';
     // A flattened contact decal gives feet a grounding cue without mobile shadow maps.
@@ -204,12 +205,16 @@ try {
       }
     }else{
       box(x,feet+h*.58,13,width*.65,3,2,boss?'gold':'brick');
+      if(body.type==='crawler'){
+        orb(x,feet+h*.45,-4,width*1.15,h*.7,32,skin);
+        for(const side of [-1,1])for(let j=0;j<3;j++)limb(x+side*16,feet+20-j*3,x+side*(28+j*3),feet+3,8-j*5,5,'boots');
+      }
       // All roles are undead: exposed ribs, dead eyes, lesions and clawed hands.
       box(x,feet+h*.54,14,width*.45,h*.2,2,skin);
       for(let j=0;j<3;j++)box(x,feet+h*.48+j*4,16,width*.38,1.5,1,'white');
       orb(x-6,feet+h*.81,12,5,6,2,'brick');
       for(const dy of [-3,0,3])shape('cone',x+face*25,feet+h*.50+dy,10,2,8,2,'white',-face*Math.PI/2,'matte',zAxis);
-      if(['brute','charger','leaper'].includes(body.type)){
+      if(['brute','charger','leaper','crawler'].includes(body.type)){
         // Mutants keep their combat role but no longer read as ordinary people.
         for(const dx of [-width*.35,width*.35])shape('cone',x+dx,feet+h*.99,0,7,16,8,'white',dx<0?.4:-.4,'matte',zAxis);
         for(const dx of [-6,6])shape('cone',x+dx,feet+h*.72,16,3,8,3,'white',Math.PI);
@@ -219,13 +224,13 @@ try {
       for(let j=0;j<3;j++)shape('cone',x-7+j*7,feet+h*.37,11,5,7,3,color,Math.PI);
       for(let j=0;j<3;j++)box(x-4+j*3,feet+h*.52-j*2,14,1.5,7,2,'dark',-.5);
       box(x+6,feet+h*.85,14,1.5,10,1,'brick',.4);
-      if(body.type==='brute'){for(const dx of [-width*.43,width*.43])orb(x+dx,feet+h*.63,1,14,16,19,skin);}
+      if(body.type==='brute'||body.type==='crawler'){for(const dx of [-width*.43,width*.43])orb(x+dx,feet+h*.63,1,14,16,19,skin);}
       if(body.type==='runner')box(x,feet+h*.61,14,width*.65,3,2,'gold');
       if(!body.dead && body.type==='shield')box(x+face*17,feet+h*.48,12,7,h*.65,20,body.guardBreak>0?'dark':'blue',0,'metal');
       if(!body.dead && body.type==='thrower')orb(x+face*18,feet+h*.7,12,12,12,12,body.attack<35?'red':'orange','glow');
       if(!body.dead && body.type==='thief'){box(x,feet+h*.65,14,20,5,4,'gold');box(x-face*8,feet+h*.5,-12,16,18,10,'gold');}
       if(!body.dead && body.type==='charger'){for(const dx of [-12,12])box(x+dx,feet+h*.65,10,12,15,14,'orange');}
-      if(!body.dead && body.type==='plated'){box(x,feet+h*.53,14,width*.85,h*.4,6,'silver',0,'metal');box(x,feet+h*.9,5,width,7,26,'silver');}
+      if(!body.dead && body.type==='plated' && !body.armorCracked){box(x,feet+h*.53,14,width*.85,h*.4,6,'silver',0,'metal');box(x,feet+h*.9,5,width,7,26,'silver');}
       if(!body.dead && body.type==='medic'){
         box(x,feet+h*.55,14,20,21,5,'white');box(x,feet+h*.55,18,4,15,2,'red');box(x,feet+h*.55,18,14,4,2,'red');
         if(body.attack<30)orb(x,feet+h+9,8,9,9,9,'green','glow');
@@ -440,6 +445,12 @@ try {
       box(L.flagX*32+15,385,0,12,12,12,'gold');
     }
     if(L.exitX>0 && (L.flagX>0 || L.info.isBoss) && L.exitX*32>cam-250 && L.exitX*32<cam+950)safeHouse(L.exitX*32,!!L.celebration);
+    if(L.secretRoute?.kind==='rooftop'){
+      const x=L.secretRoute.x+96;
+      box(x,140,-80,192,148,48,'#334654',0,'scenery');
+      box(x,218,-53,200,8,54,'#526677',0,'scenery');
+      for(const dx of [-62,0,62])box(x+dx,160,-53,24,28,3,'glass',0,'scenery');
+    }
     for(const z of L.zs)if(z.alive&&z.active&&z.x>cam-80&&z.x<cam+880)person(z,false);
     if(L.boss)person(L.boss,false,true);
     if(L.crate)box(L.crate.x+16,448-L.crate.y-16,0,32,32,32,'gold');
@@ -449,7 +460,7 @@ try {
     }
     for(const shot of game.spits)orb(shot.x,448-shot.y,4,12,12,12,'green','glow');
     for(const p of game.parts.slice(-100)){
-      if(p.kind==='impact'||p.kind==='dash')continue;
+      if(p.kind==='impact'||p.kind==='dash'||p.kind==='armorbreak')continue;
       if(p.kind==='confetti'){box(p.x,448-p.y,30,4,3,1,p.c,p.spin,'cue');continue;}
       if(p.kind==='powerpop'){box(p.x,448-p.y,12,22,22,12,'teal');box(p.x,448-p.y,20,4,15,3,'white');box(p.x,448-p.y,20,15,4,3,'white');continue;}
       if(p.kind==='boltpop'){kingCake(p.x,448-p.y);continue;}
