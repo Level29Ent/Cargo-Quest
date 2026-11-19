@@ -180,7 +180,7 @@ try {
       box(x-face*13,feet+h*.52,-9,11,22,16,'purple');
       box(x-face*13,feet+h*.52,0,12,4,2,'gold');
       orb(x+face*22,feet+h*.51,11,7,7,7,'boots');
-      const w=window.__game.weapon;
+      const w=body.role==='partner'?{name:'Carbine',color:'#7cfff0'}:window.__game.weapon;
       const length=w.name==='Railgun'?46:w.name==='Shotgun'?36:30;
       const kick=body.recoil||0;
       const gunX=x-face*kick;

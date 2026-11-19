@@ -1949,11 +1949,7 @@ function drawAdventure(){
     }
     for(const key of Object.keys(L.secrets||{})){const [x,y]=key.split(',').map(Number);sh('*',x*T+16,y*T+10,'#ffe08a',10,'center');}
   }
-  if(partner&&!partner.down&&!window.Cargo3D?.enabled){
-    cx.fillStyle='#7cfff0';cx.fillRect(partner.x,partner.y+18,partner.w,28);cx.fillStyle='#e9bc92';cx.fillRect(partner.x+3,partner.y+2,18,16);cx.fillStyle='#26394f';cx.fillRect(partner.x+1,partner.y+46,8,14);cx.fillRect(partner.x+15,partner.y+46,8,14);sh('P2',partner.x+12,partner.y-14,'#7cfff0',8,'center');
-    if(partner.flash>0){cx.fillStyle='#ffe08a';cx.fillRect(partner.x+12+partner.face*30,partner.y+26,8,4);}
-  }
-  if(partner&&!partner.down&&window.Cargo3D?.enabled)sh('P2',partner.x+12,partner.y-14,'#7cfff0',8,'center');
+  if(partner&&!partner.down)sh('P2',partner.x+12,partner.y-14,'#7cfff0',8,'center');
   if(preferences.contrast)for(const e of [...(L.elements||[]),...(L.sweepers||[])])if(['thorn','storm','steam'].includes(e.kind)||!e.kind){cx.strokeStyle='#fff';cx.lineWidth=3;cx.strokeRect(e.x,GROUND-8,e.w,8);sh('DANGER',e.x+e.w/2,GROUND-28,'#fff',8,'center');}
   if(gameMode==='campaign'&&rescueHub.rescued.length>0&&L.exitX>0)for(let i=0;i<Math.min(4,rescueHub.rescued.length);i++){const x=L.exitX*T+30+i*26;cx.fillStyle=['#7cfff0','#ffd25d','#ff9b54','#c58bff'][i];cx.fillRect(x,GROUND-30,13,22);cx.fillStyle='#e9bc92';cx.fillRect(x+2,GROUND-40,9,10);}
   for(const q of popups)sh(q.txt,q.x,q.y,q.damage?'#ffe08a':'#fff',q.damage?9:10,'center');
@@ -2402,6 +2398,7 @@ function drawLevel(){
     cx.strokeStyle = b.color||'#ffe14a'; cx.lineWidth = 3; cx.beginPath(); cx.moveTo(b.x, b.y); cx.lineTo(b.x - b.vx*1.4, b.y - b.vy*1.4); cx.stroke();
     cx.strokeStyle = 'rgba(255,120,40,.6)'; cx.lineWidth = 1.5; cx.beginPath(); cx.moveTo(b.x - b.vx*1.4, b.y - b.vy*1.4); cx.lineTo(b.x - b.vx*2.4, b.y - b.vy*2.4); cx.stroke();
   }
+  if(partner&&!partner.down&&!(state==='play'&&partner.inv>0&&frame%6<3))drawPlayer(partner);
   if (!(state==='play' && player.inv>0 && frame%6<3)) drawPlayer(player);
   cx.restore();
 }
@@ -2604,7 +2601,7 @@ function drawPlayer(p){
   cx.fillStyle = '#6b6b3a'; cx.fillRect(-2, 22, 4, 3);
   cx.fillStyle = '#1a1a1a'; cx.fillRect(-10, 21, 20, 2);
   // Medal-earned outfit (visual only).
-  cx.fillStyle = cosmetic('outfit').color; cx.fillRect(-10, 8, 20, 15);
+  cx.fillStyle = p.role==='partner'?'#7cfff0':cosmetic('outfit').color; cx.fillRect(-10, 8, 20, 15);
   cx.fillStyle = '#222'; cx.fillRect(-10, 8, 20, 2);
   if (up.armor > 0){ cx.fillStyle = '#3a3f2a'; cx.fillRect(-9, 10, 18, 11); cx.fillStyle = '#2a2e1e'; cx.fillRect(-9, 15, 18, 2); }
   cx.fillStyle = '#f5b800'; cx.font = '5px "Press Start 2P", monospace'; cx.textAlign='center'; cx.fillText('29', -1, 18);
@@ -2617,7 +2614,7 @@ function drawPlayer(p){
   // Shared gun body with distinct new weapon attachments.
   const r = -p.recoil;
   cx.save(); cx.translate(r, 0);
-  const equipped=WEAPONS[weaponIndex];
+  const equipped=WEAPONS[p.role==='partner'?0:weaponIndex];
   if(equipped.name==='Bayou Crossbow'){cx.strokeStyle=equipped.color;cx.lineWidth=3;cx.beginPath();cx.moveTo(29,1);cx.lineTo(37,15);cx.lineTo(29,29);cx.stroke();}
   if(equipped.name==='Grenade Launcher'){cx.fillStyle=equipped.color;cx.fillRect(8,13,25,12);}
   if(equipped.name==='Nail Repeater'){cx.fillStyle=equipped.color;cx.fillRect(16,8,22,3);}
