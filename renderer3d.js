@@ -328,7 +328,7 @@ try {
       }else{
         const color=tile==='='?'#28788b':tile==='?'?'gold':tile==='M'?'white':tile==='B'?'#d27b38':tile==='H'?'#a85d30':tile==='U'?'#826044':'#c97831';
         box(wx,wy,0,31,32,38,color);
-        if(tile==='?'||tile==='M'){box(wx,wy,21,5,17,3,tile==='M'?'red':'purple');box(wx,wy+3,21,14,5,3,tile==='M'?'red':'purple');}
+        if(tile==='?'||tile==='M'){const mark=tile==='M'?'red':'purple';box(wx,wy,21,5,17,3,mark);box(wx,wy+3,21,14,5,3,mark);}
         // Dark frame + bright top lip: solid objects read independently of backdrop or hue.
         const topColor=tile==='='?'#7cfff0':'#ffe3a0';
         box(wx,wy+14,21,32,4,3,'#101b29',0,'cue');
@@ -409,6 +409,7 @@ try {
     for(const shot of game.spits)orb(shot.x,448-shot.y,4,12,12,12,'green','glow');
     for(const p of game.parts.slice(-100)){
       if(p.kind==='confetti'){box(p.x,448-p.y,30,4,3,1,p.c,p.spin,'cue');continue;}
+      if(p.kind==='powerpop'){box(p.x,448-p.y,12,22,22,12,'teal');box(p.x,448-p.y,20,4,15,3,'white');box(p.x,448-p.y,20,15,4,3,'white');continue;}
       if(p.kind==='boltpop'){kingCake(p.x,448-p.y);continue;}
       if(p.kind==='blast'||p.kind==='frostpulse'){
         const r=p.r*(1-p.t/(p.kind==='blast'?16:20));

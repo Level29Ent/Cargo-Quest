@@ -573,7 +573,7 @@ const bulletDmg = () => 1 + up.ap * .5;
 
 // ---------- Level building ----------
 const COURSES = [
-  {name:'Neon Market', element:'supply', hint:'Jump into supply crates for coins', sky:'#172239', accent:'#ffb955'},
+  {name:'Neon Market', element:'supply', hint:'Hit ? boxes for power-ups and king cakes', sky:'#172239', accent:'#ffb955'},
   {name:'Canal Bridges', element:'spring', hint:'Green pads launch you upward', sky:'#12364a', accent:'#47dbb4'},
   {name:'Iron Foundry', element:'steam', hint:'Orange vents flash before hot steam', sky:'#351d29', accent:'#ff794d'},
   {name:'Skyline Rooftops', element:'wind', hint:'Air currents extend held jumps', sky:'#233a57', accent:'#a5d7ff'},
@@ -614,6 +614,13 @@ function decorateCourse(level){
       if(perch!==undefined){z.x=perch*T+3;z.type='thrower';z.y=8*T-z.h;z.speed=0;z.attack=90;}
     }
   });
+  // Hide free powers in half the existing mystery boxes without changing the layout.
+  let mystery=0, reward=0;
+  level.boxPowers={};
+  for(let x=0;x<level.W;x++)for(let y=0;y<12;y++){
+    if(level.grid[y][x]==='?' && mystery++%2===0)
+      level.boxPowers[x+','+y]=SHOP_POWERS[(level.i*5+reward++*7)%SHOP_POWERS.length].id;
+  }
   // Reachable, free power caches create variety without spending saved coins.
   level.pickups=[{x:7*T,y:GROUND-30,id:SHOP_POWERS[(level.i+8)%SHOP_POWERS.length].id,got:false}];
   return level;
@@ -830,7 +837,7 @@ function startDaily(day){
   const d=dailyContract(day);activeRun={...d,finished:false,locked:false,result:''};
   newGame(d.stage,'daily');selectWeapon(d.weapon);activeRun.locked=true;
   document.getElementById('bWeapon').textContent=WEAPONS[d.weapon].name+' · DAILY LOCKED';
-  L.pickups=[];lives=1;frame=0;
+  L.pickups=[];L.boxPowers={};lives=1;frame=0;
 }
 function buildArena(){
   const level=buildLevel(0);level.W=25;level.grid=Array.from({length:ROWS},(_,y)=>Array.from({length:25},(_,x)=>y>=12?'#':x===0||x===24?'H':' '));
@@ -1105,7 +1112,13 @@ function moveBody(b, onHeadHit){
 
 function hitBlock(tx, ty){
   const t = L.grid[ty][tx];
-  if (t==='?'){
+  if (t==='?' && L.boxPowers[tx+','+ty]){
+    L.grid[ty][tx]='U';bumps.push({tx,ty,t:10});
+    const id=L.boxPowers[tx+','+ty];
+    grantPower(id);snd('power');
+    parts.push({kind:'powerpop',x:tx*T+T/2,y:ty*T,vy:-6,t:40});
+    popups.push({x:tx*T+T/2,y:ty*T-12,t:100,txt:SHOP_POWERS.find(item=>item.id===id).name});
+  } else if (t==='?'){
     L.grid[ty][tx]='U'; bumps.push({tx,ty,t:10});
     parts.push({kind:'boltpop', x:tx*T+T/2, y:ty*T, vy:-7, t:28});
     addBolt(tx*T+T/2, ty*T-10);
@@ -1593,7 +1606,7 @@ function updateFx(){
     if (q.kind==='brick' || q.kind==='gore' || q.kind==='shell'){ q.vy += .45; q.x += q.vx; q.y += q.vy; if (q.kind==='gore' && q.y > GROUND && solidAt(Math.floor(q.x/T),12)) { q.y = GROUND; q.vx = 0; q.vy = 0; } }
     else if(q.kind==='confetti'){q.x+=q.vx;q.y+=q.vy;q.vy+=.12;q.spin+=.15;}
     else if (q.kind==='puff'){ q.x += q.vx; q.y += q.vy; }
-    else if (q.kind==='boltpop' || q.kind==='medpop'){ q.vy += .55; q.y += q.vy; }
+    else if (q.kind==='boltpop' || q.kind==='medpop' || q.kind==='powerpop'){ q.vy += .55; q.y += q.vy; }
   }
   parts = parts.filter(q=>q.t>0);
   if (parts.length > 400) parts.splice(0, parts.length - 400);
@@ -2027,6 +2040,7 @@ function drawLevel(){
       cx.strokeStyle=q.kind==='blast'?'#ffb35d':'#a0fff2';cx.lineWidth=q.kind==='blast'?3:2;
       cx.beginPath();cx.arc(q.x,q.y,q.r*(1-q.t/(q.kind==='blast'?16:20)),0,Math.PI*2);cx.stroke();
     }
+    else if (q.kind==='powerpop'){cx.fillStyle='#79ffdf';cx.fillRect(q.x-11,q.y-11,22,22);sh('+',q.x,q.y+5,'#142d3a',16,'center');}
     else if (q.kind==='medpop') drawMedkit(q.x, q.y);
     else drawKingCake(q.x, q.y);
   }

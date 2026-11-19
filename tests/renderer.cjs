@@ -109,7 +109,8 @@ assert.equal(cakeMeshes().reduce((n,m)=>n+m.count,0),8,'crate reward uses the sa
 dailyGame.parts=[];dailyGame.L.bolts=savedCakes;
 // Explicit mixed obstacle/pit/hazard fixture: borders and warning phases remain distinct.
 const fixtureGame=world.window.__game;
-fixtureGame.L.grid[9].splice(5,8,'H','B','P','p','?','M','U','=');fixtureGame.L.grid[12][9]=' ';
+fixtureGame.L.grid[9].splice(5,8,'H','B','P','p','?','M','U','=');
+fixtureGame.parts=[{kind:'powerpop',x:300,y:280,t:30}];fixtureGame.L.grid[12][9]=' ';
 fixtureGame.cam=0;
 for(const [kind,phase,color] of [['steam',0,'ffad66'],['steam',150,'ffd25d'],['steam',190,'ff6565'],['storm',190,'ff6565'],['thorn',0,'ff6565']]){
  fixtureGame.frame=phase;fixtureGame.L.elements=[{x:320,w:96,kind,phase:0}];world.window.__game=fixtureGame;view.render(fixtureGame);
