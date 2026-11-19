@@ -79,6 +79,12 @@ for(const type of ['walker','runner','brute','shield','thief','thrower','plated'
   assert.ok(meshes.length<100,'role details remain batched');
  }
 }
+// Local teammate is a real 3D courier and team cargo uses that actor's position.
+test.startCampaignPlayers(true);test.state='play';
+const teamGame={L:test.L,partner:test.partner,cam:0,frame:200,player:test.p,effects:{},weapon:test.WEAPONS[0],flagY:64,bullets:[],spits:[],parts:[],state:'play'};
+Object.assign(test.L.cargo,{carried:true,carrier:'partner'});const teamBefore=JSON.stringify([test.p,test.partner,test.L.cargo]);world.window.__game=teamGame;view.render(teamGame);assert.equal(JSON.stringify([test.p,test.partner,test.L.cargo]),teamBefore);
+for(const m of lastScene.children.filter(m=>m.isInstancedMesh&&m.count>0))assert.ok(m.instanceMatrix.array.subarray(0,m.count*16).every(Number.isFinite));
+test.startCampaignPlayers(false);
 // Safe houses and parade confetti render in all regions, including boss exits.
 for(const stage of [0,4,5,9,10,14,15,19,20,24,99]){
  test.newGame(stage);test.L.celebration={ticks:100};const x=test.L.exitX*32;

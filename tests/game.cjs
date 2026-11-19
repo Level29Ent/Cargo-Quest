@@ -9,8 +9,8 @@ function el(){return {set width(v){this._width=v;drawing.imageSmoothingEnabled=t
 const listeners={};
 const sandbox={console,Math,Set,Image:function(){},innerWidth:390,innerHeight:844,performance:{now:()=>0},requestAnimationFrame(){},setTimeout(){},addEventListener(name,fn){listeners[name]=fn;},document:{getElementById:id=>nodes[id]??=el(),createElement:()=>el(),createTextNode:text=>({textContent:text}),querySelectorAll:()=>[],addEventListener(name,fn){listeners[name]=fn;}},localStorage:{getItem:k=>store[k]??null,setItem:(k,v)=>store[k]=v}};
 sandbox.window=sandbox;
-src=src.replace('window.__game =',`window.test={cycleContract,useTunnel,resumeCheckpoint,hurtDelivery,updateDelivery,finishDelivery,pushEnemy,killPlayer,updateAdventure,drawAdventure,registerHit,hitBlock,buildLevel,moveBody,newGame,update,openShop,closeShop,purchasePower,earnCoins,addBolt,killZombie,hurtPlayer,fire,spawnBoss,SHOP_POWERS,WEAPONS,selectWeapon,grantPower,COURSES,fit,drawHUD,togglePause,releaseControls,finishStage,updateCargo,dropCargo,equipCosmetic,medalCount,loadCampaign,saveCampaign,updateBoss,targetTicks,openCampaign,closeCampaign,startDaily,startSurvival,dailyContract,finishMode,retryMode,spawnWave,updateSurvival,loadModeRecords,renderFieldGuide,modeStatus,drawScreens,startLevel,drawLevel,drawKingCake,makeZombie,detonate,clearShot,startCelebration,updateClear,loop,
-get lives(){return lives},get cam(){return cam},get score(){return score},get popups(){return popups},get clearPhase(){return clearPhase},get gameMode(){return gameMode},get activeRun(){return activeRun},get modeRecords(){return modeRecords},
+src=src.replace('window.__game =',`window.test={onEnter,remapAction,readPreferences,setPreference,actionHeld,readHub,recordRescue,renderExtras,startCampaignPlayers,updatePartner,hurtPartner,resetPartner,updateMonsterAudio,shakeAmount,updateArena,updateSignature,cycleContract,useTunnel,resumeCheckpoint,hurtDelivery,updateDelivery,finishDelivery,pushEnemy,killPlayer,updateAdventure,drawAdventure,registerHit,hitBlock,buildLevel,moveBody,newGame,update,openShop,closeShop,purchasePower,earnCoins,addBolt,killZombie,hurtPlayer,fire,spawnBoss,SHOP_POWERS,WEAPONS,selectWeapon,grantPower,COURSES,fit,drawHUD,togglePause,releaseControls,finishStage,updateCargo,dropCargo,equipCosmetic,medalCount,loadCampaign,saveCampaign,updateBoss,targetTicks,openCampaign,closeCampaign,startDaily,startSurvival,dailyContract,finishMode,retryMode,spawnWave,updateSurvival,loadModeRecords,renderFieldGuide,modeStatus,drawScreens,startLevel,drawLevel,drawKingCake,makeZombie,detonate,clearShot,startCelebration,updateClear,loop,
+get endingPage(){return endingPage},get preferences(){return preferences},get hub(){return rescueHub},get partner(){return partner},get monsterCue(){return monsterCue},get monsterCueCd(){return monsterCueCd},get coopEnabled(){return coopEnabled},get lives(){return lives},get cam(){return cam},get score(){return score},get popups(){return popups},get clearPhase(){return clearPhase},get gameMode(){return gameMode},get activeRun(){return activeRun},get modeRecords(){return modeRecords},
 get campaign(){return campaign},get cosmetics(){return COSMETICS},
 get parts(){return parts},
 get frame(){return frame},get weaponIndex(){return weaponIndex},set frame(v){frame=v},
@@ -192,7 +192,7 @@ assert.equal(t.campaign.stage,2);const restored=t.loadCampaign();assert.equal(re
 assert.equal(t.equipCosmetic('courier'),true);assert.equal(t.equipCosmetic('royal'),false);assert.equal(t.equipCosmetic('not-real'),false);assert.equal(t.loadCampaign().equipped.outfit,'courier');
 // All reward tiers unlock on actual medal counts, without spending wallet or changing stats.
 const cosmeticWallet=t.wallet;t.campaign.stages={};for(let i=0;i<15;i++)t.campaign.stages[i]={clear:true,speed:true,cargo:true,ticks:500,grade:'GOLD'};
-for(const item of t.cosmetics)assert.equal(t.equipCosmetic(item.id),true,item.id);assert.equal(t.wallet,cosmeticWallet);
+for(const item of t.cosmetics.filter(c=>!c.rescues))assert.equal(t.equipCosmetic(item.id),true,item.id);assert.equal(t.wallet,cosmeticWallet);
 t.newGame(10);assert.equal(t.p.health,4,'only existing boss armor affects health, not outfit');
 // Loading rejects invalid stages, scores, medal flags and locked cosmetic selections.
 store['cargoQuest2.campaign.v1']=JSON.stringify({version:1,stage:999,best:-1,stages:{0:{clear:'yes',speed:false,cargo:false,ticks:-5}},equipped:{outfit:'royal'}});
@@ -600,6 +600,59 @@ audit('new delivery content stays out of extra modes and has safe campaign place
 
  t.startDaily('2026-11-19');assert.equal(t.L.rescue,null);assert.equal(t.L.checkpoint,null);assert.equal(t.L.secretRoute,null);assert.equal(t.cycleContract(),false);
  t.startSurvival();assert.equal(t.L.rescue,null);assert.equal(t.L.checkpoint,null);assert.equal(t.L.secretRoute,null);assert.equal(t.resumeCheckpoint(),false);
+});
+
+audit('preferences validate saved input, remap without collisions, and persist safely',()=>{
+ const key='cargoQuest2.preferences.v1';store[key]=JSON.stringify({shake:9,contrast:'yes',assist:'bad',bindings:{left:'p'}});const clean=t.readPreferences();assert.equal(clean.shake,1);assert.equal(clean.assist,false);assert.equal(clean.bindings.left,'a');
+ assert.equal(t.remapAction('left','p'),false);assert.equal(t.remapAction('left','d'),false);assert.equal(t.remapAction('fire','j'),false);assert.equal(t.remapAction('fire','w'),false);assert.equal(t.remapAction('missing','o'),false);
+ assert.equal(t.remapAction('left','h'),true);t.keys.a=true;assert.equal(!!t.actionHeld('left'),false);t.keys.h=true;assert.equal(!!t.actionHeld('left'),true);t.releaseControls();
+ assert.equal(t.readPreferences().bindings.left,'h');assert.equal(t.remapAction('left','a'),true);
+ assert.equal(t.setPreference('shake',0),true);assert.equal(t.shakeAmount(),0);t.setPreference('shake',.5);assert.equal(t.shakeAmount(),.5);sandbox.matchMedia=()=>({matches:true});assert.equal(t.shakeAmount(),0);delete sandbox.matchMedia;t.setPreference('shake',1);
+ const prior=sandbox.localStorage.setItem;sandbox.localStorage.setItem=()=>{throw Error('blocked');};assert.doesNotThrow(()=>t.setPreference('contrast',true));sandbox.localStorage.setItem=prior;t.setPreference('contrast',false);
+});
+audit('campaign assists are sticky for medal eligibility, leave daily/survival unassisted',()=>{
+ t.setPreference('assist',true);combatRoom();assert.equal(t.p.health,5);assert.equal(t.L.assisted,true);t.setPreference('assist',false);assert.equal(t.L.assisted,true);assert.equal(t.p.health,3);
+ delete t.campaign.stages[0];t.L.runTicks=10;t.finishStage();assert.equal(t.campaign.stages[0].speed,false);assert.equal(t.campaign.stages[0].ticks,null);
+ t.setPreference('assist',true);t.startDaily('2026-11-19');assert.equal(t.p.health,3);assert.equal(t.partner,null);t.startSurvival();assert.equal(t.p.health,3);assert.equal(t.partner,null);t.setPreference('assist',false);
+});
+audit('rescues persist unique stages, unlock cosmetic without stats, reject malformed saves',()=>{
+ t.hub.rescued.length=0;combatRoom();assert.equal(t.equipCosmetic('guardian'),false);for(const stage of [0,0,1,2])t.recordRescue(stage);assert.equal(t.hub.rescued.length,3);assert.equal(t.readHub().rescued.length,3);
+ const hearts=t.p.health,wallet=t.wallet;assert.equal(t.equipCosmetic('guardian'),true);assert.equal(t.p.health,hearts);assert.equal(t.wallet,wallet);assert.equal(t.loadCampaign().equipped.outfit,'guardian');t.renderExtras();
+ store['cargoQuest2.rescueHub.v1']=JSON.stringify({rescued:[-1,0,0,99,100,'1'],finished:'yes'});const hub=t.readHub();assert.equal(hub.rescued.join(','),'0,99');assert.equal(hub.finished,false);
+});
+audit('local co-op has independent movement and shooting with shared cargo and checkpoints',()=>{
+ t.startCampaignPlayers(true);t.state='play';t.L.zs=[];t.L.elements=[];t.L.pickups=[];t.L.bolts=[];t.L.sweepers=[];t.L.rescue=null;t.L.secretRoute=null;t.L.grid=Array.from({length:14},(_,y)=>Array(50).fill(y>=12?'#':' '));t.L.W=50;t.L.flagX=-1;
+ Object.assign(t.p,{x:96,y:324,onGround:true});Object.assign(t.partner,{x:150,y:324,onGround:true,inv:0,vx:0,vy:0});const x=t.partner.x,px=t.p.x;
+ t.keys.l=true;t.keys.k=true;for(let i=0;i<12;i++)t.update();t.releaseControls();assert.ok(t.partner.x>x);assert.equal(t.p.x,px,'P2 keys never move P1');assert.ok(t.bullets.length>0);assert.equal(t.p.heat,0,'P2 fire never consumes P1 heat');
+ Object.assign(t.L.cargo,{x:t.partner.x+12,y:t.partner.y+30,carried:false,lock:0});t.updateCargo();assert.equal(t.L.cargo.carried,true);assert.equal(t.L.cargo.carrier,'partner');
+ t.L.delivery.kind='fragile';t.L.delivery.integrity=1;t.partner.inv=0;t.hurtPartner(300);assert.equal(t.L.delivery.integrity,0);assert.equal(t.partner.health,2);
+ t.L.checkpoint={x:500,y:324,active:true,used:false};assert.equal(t.resumeCheckpoint(),true);assert.equal(t.p.x,500);assert.ok(t.partner.x>=500);assert.equal(t.partner.health,3);
+ const frame=t.frame;t.openCampaign();const partnerX=t.partner.x;for(let i=0;i<20;i++)t.update();assert.equal(t.frame,frame);assert.equal(t.partner.x,partnerX);t.closeCampaign();
+ t.startCampaignPlayers(false);assert.equal(t.partner,null);assert.equal(t.coopEnabled,false);
+});
+audit('downed partner spends one spare life, transfers cargo, respects freeze and cannot shoot',()=>{
+ t.startCampaignPlayers(true);t.state='play';t.L.zs=[];t.L.elements=[];t.L.sweepers=[];t.L.pickups=[];t.L.bolts=[];t.L.rescue=null;Object.assign(t.partner,{health:1,inv:0,y:324});t.L.cargo.carried=true;t.L.cargo.carrier='partner';t.hurtPartner(400);assert.equal(t.partner.down,180);assert.equal(t.L.cargo.carrier,'player');
+ const lives=t.lives;t.keys.k=true;const bullets=t.bullets.length;for(let i=0;i<179;i++)t.updatePartner();assert.equal(t.bullets.length,bullets);t.updatePartner();assert.equal(t.lives,lives-1);assert.equal(t.partner.health,3);t.releaseControls();
+ t.startDaily('2026-11-19');assert.equal(t.partner,null);assert.equal(t.coopEnabled,false);t.newGame(0);assert.equal(t.partner,null);
+});
+audit('monster cues distinguish roles, captions show direction and cadence pauses with game',()=>{
+ combatRoom();t.L.zs=[t.makeZombie(250,'crawler','nola',()=>.5)];t.updateMonsterAudio();assert.ok(t.monsterCue.text.includes('CRAWLER RUMBLE'));assert.ok(t.monsterCue.text.includes('RIGHT'));const cue=t.monsterCue.text,cd=t.monsterCueCd;
+ t.L.zs=[t.makeZombie(220,'runner','nola',()=>.5)];t.updateMonsterAudio();assert.equal(t.monsterCue.text,cue);assert.equal(t.monsterCueCd,cd-1);
+ t.openShop();for(let i=0;i<90;i++)t.update();assert.equal(t.monsterCueCd,cd-1);t.closeShop();for(let i=0;i<181;i++)t.updateMonsterAudio();assert.ok(t.monsterCue.text.includes('RASPING SPRINT'));
+});
+audit('regional arena threats warn, can be jumped, and final boss cycles five signatures',()=>{
+ for(const stage of [4,9,14,19,24]){
+  cleanRun(stage);t.spawnBoss();const b=t.L.boss;b.arenaClock=299;t.updateArena(b);assert.ok(b.arenaHazards.length>0);assert.ok(b.arenaHazards.every(e=>!e.hot));
+  b.arenaClock=359;t.p.onGround=false;t.p.y=200;const hp=t.p.health;t.updateArena(b);assert.equal(t.p.health,hp,'airborne player clears regional floor threat');t.drawAdventure();
+ }
+ cleanRun(99);t.spawnBoss();const b=t.L.boss;
+ for(const region of ['nola','la','hou','lej','pi']){b.signatureWarning=1;t.updateSignature(b);assert.equal(b.activeSignature,region);assert.equal(b.signatureCd,180);}
+ t.L.cargo.carried=true;t.finishDelivery();assert.equal(t.hub.finalDelivered,true);
+});
+audit('ending has three readable chapters before a new run and remembers completion',()=>{
+ t.newGame(99);t.state='win';t.L.cargo.delivered=true;t.drawScreens();assert.ok(hudText.includes('THE FINAL MEDICINE CONVOY IS HOME'));
+ t.onEnter();assert.equal(t.state,'win');assert.equal(t.endingPage,1);t.drawScreens();assert.ok(hudText.includes('THE SAFE HOUSE BECOMES A NEIGHBORHOOD'));
+ t.onEnter();assert.equal(t.endingPage,2);t.drawScreens();assert.ok(hudText.includes('CARGO QUEST · A LEVEL 29 ADVENTURE'));t.onEnter();assert.equal(t.state,'intro');assert.equal(t.L.i,0);
 });
 if(auditFailures.length)throw Error('AUDIT FAILURES\n'+auditFailures.join('\n'));
 module.exports = { test: t };
