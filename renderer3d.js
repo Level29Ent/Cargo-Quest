@@ -130,9 +130,9 @@ try {
     const h=body.h, width=body.w, face=isPlayer?body.face:body.dir||body.face||-1;
     const gait=Math.sin(body.anim||0)*(body.onGround===false?2:7);
     const hurt=!isPlayer && body.flash>0;
-    const infectedSkin=body.type==='brute'?'#68816b':body.type==='runner'?'#a4b578':'zombie';
+    const infectedSkin=body.type==='brute'?'#68816b':body.type==='runner'?'#a4b578':body.type==='leaper'?'teal':body.type==='charger'?'#68816b':'zombie';
     const skin=hurt?'white':isPlayer?'skin':infectedSkin;
-    const color=hurt?'white':isPlayer?(window.__game.cosmetic?.outfit||'purple'):boss?'red':body.type==='runner'?'brick':body.type==='brute'?'dark':body.type==='medic'?'teal':body.type==='thief'?'purple':'blue';
+    const color=hurt?'white':isPlayer?(window.__game.cosmetic?.outfit||'purple'):boss?'red':body.type==='runner'?'brick':body.type==='brute'?'dark':body.type==='medic'?'teal':body.type==='thief'?'purple':'boots';
     // A flattened contact decal gives feet a grounding cue without mobile shadow maps.
     if(body.onGround)orb(x,feet+.5,-2,width*1.7,1.5,32,'#17212c');
     limb(x-6,feet+h*.38,x-7+gait,feet+8,0,8,isPlayer?'purple':'dark');
@@ -204,6 +204,17 @@ try {
       }
     }else{
       box(x,feet+h*.58,13,width*.65,3,2,boss?'gold':'brick');
+      // All roles are undead: exposed ribs, dead eyes, lesions and clawed hands.
+      box(x,feet+h*.54,14,width*.45,h*.2,2,skin);
+      for(let j=0;j<3;j++)box(x,feet+h*.48+j*4,16,width*.38,1.5,1,'white');
+      orb(x-6,feet+h*.81,12,5,6,2,'brick');
+      for(const dy of [-3,0,3])shape('cone',x+face*25,feet+h*.50+dy,10,2,8,2,'white',-face*Math.PI/2,'matte',zAxis);
+      if(['brute','charger','leaper'].includes(body.type)){
+        // Mutants keep their combat role but no longer read as ordinary people.
+        for(const dx of [-width*.35,width*.35])shape('cone',x+dx,feet+h*.99,0,7,16,8,'white',dx<0?.4:-.4,'matte',zAxis);
+        for(const dx of [-6,6])shape('cone',x+dx,feet+h*.72,16,3,8,3,'white',Math.PI);
+        for(let j=0;j<3;j++)shape('cone',x-face*width*.42,feet+h*(.43+j*.12),2,6,10,6,'boots',face*Math.PI/2,'matte',zAxis);
+      }
       // Ragged hem, exposed rib slashes and asymmetrical scalp stitches.
       for(let j=0;j<3;j++)shape('cone',x-7+j*7,feet+h*.37,11,5,7,3,color,Math.PI);
       for(let j=0;j<3;j++)box(x-4+j*3,feet+h*.52-j*2,14,1.5,7,2,'dark',-.5);

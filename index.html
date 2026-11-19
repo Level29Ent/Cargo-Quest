@@ -912,14 +912,14 @@ function renderFieldGuide(){
     ['Dash','V or touch DASH: short horizontal burst, 1.25-second recharge. One airborne dash per landing. No invulnerability; walls stop it.'],
     ['Ring run and secrets','Campaign only: collect three purple rings in order within ten seconds of the first for 15 coins and 1500 score. Star-marked existing bricks hide 10 coins and 1000 score. Optional; reset on retry.'],
     ['Sweep beam','Gold floor marker warns before a low red beam. Jump over it; it does not block movement.'],
-    ['Charger','Orange shoulder pads. Exclamation warns for 0.75 seconds, then it rushes straight ahead and recovers for one second. Jump over, flank or stagger with shots.'],
+    ['Charger monster','Horned undead with orange shoulder pads. Exclamation warns for 0.75 seconds, then it rushes straight ahead and recovers for one second. Jump over, flank or stagger with shots.'],
     ['Walker','Slow pursuer. Shoot or stomp; keep distance to manage heat.'],
     ['Runner','Closes distance quickly. Jump over or use Cryo to slow it.'],
-    ['Brute','Heavy target with seven health; stomps deal three damage. Railgun and Plasma are effective.'],
+    ['Brute monster','Horned undead heavy. Heavy target with seven health; stomps deal three damage. Railgun and Plasma are effective.'],
     ['Shield zombie','Blue shield blocks one frontal hit, then opens for 45 ticks. Follow up, flank or stomp.'],
     ['Cargo thief','Gold-marked, fast enemy. Contact knocks cargo onto visible open street for recovery.'],
     ...WEAPONS.slice(6).map(w=>[w.name,w.desc+' Select with '+(WEAPONS.indexOf(w)+1)+', Q/E or the free store loadout.']),
-    ['Leaper','Orange-legged hopper. Stops with a warning marker for half a second before leaping. Freeze pauses its windup.'],
+    ['Leaper monster','Horned, clawed undead hopper with orange legs. Stops with a warning marker for half a second before leaping. Freeze pauses its windup.'],
     ['Plated zombie','Grey body armor halves ordinary bullet damage. Piercing weapons ignore armor; stomps bypass it.'],
     ['Medic zombie','White cross backpack. Every three seconds heals nearby other zombies by one, never itself or through walls. Prioritize it.'],
     ['Rooftop thrower','Stationary perch attacker. Watch the lob arc; Cryo slows movement but Freeze Wave stops attacks.'],
@@ -2248,6 +2248,15 @@ function drawZombie(z){
   cx.restore();
   cx.restore();
   if(!z.dead){
+    // Undead anatomy and mutant silhouettes, not ordinary human opponents.
+    cx.fillStyle='#86a46e';cx.fillRect(z.x+z.w*.3,z.y+z.h*.43,z.w*.4,12);
+    cx.fillStyle='#d8d4ca';for(let j=0;j<3;j++)cx.fillRect(z.x+z.w*.32,z.y+z.h*.45+j*4,z.w*.36,1);
+    for(const dy of [0,3,6])cx.fillRect(z.x+z.w/2+z.dir*17,z.y+z.h*.52+dy,6,1);
+    if(['brute','charger','leaper'].includes(z.type)){
+      cx.fillStyle='#d8d4ca';
+      for(const side of [-1,1]){const x=z.x+z.w/2+side*z.w*.3;cx.beginPath();cx.moveTo(x-3,z.y+5);cx.lineTo(x+side*3,z.y-7);cx.lineTo(x+3,z.y+5);cx.fill();}
+      cx.fillRect(z.x+z.w/2-5,z.y+17,2,5);cx.fillRect(z.x+z.w/2+4,z.y+17,2,5);
+    }
     // Torn clothing, facial scar and boot highlights retain each role's silhouette.
     cx.fillStyle='#263126';cx.fillRect(z.x+6,z.y+z.h-3,z.w-8,2);
     cx.fillStyle='#4b2928';cx.fillRect(z.x+z.w/2+3,z.y+9,2,6);
