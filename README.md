@@ -12,6 +12,10 @@ The enhanced renderer uses smooth low-poly sphere/cylinder/cone characters, an a
 
 The renderer uses shared instanced geometry/materials, view-window culling, and native-density output up to 2× with a three-million-pixel budget shared in policy by the 3D and HUD canvases. It defaults to 3D on WebGL2-capable browsers. The 3D/2D button switches rendering without restarting gameplay. If WebGL initialization or its context fails, gameplay falls back to the original 2D renderer. Real device performance still depends on GPU/browser support. 
 
+## Character art polish
+
+The 3D courier keeps the purple/green/gold jester identity, with a harness, diamond applique, delivery pack, gloves, kneepads and more sculpted face/ears/brows. Medal-earned outfit and weapon colors remain visible. Infected use role-specific clothing and skin palettes, inset sockets, brows, uneven teeth, torn hems and scars; brutes get broader shoulders. Existing shields, medic crosses, armor, thief bags and attack warnings remain distinct. The 2D fallback gains matching tailoring, a pack, scars and fabric tears while retaining the original logo head. All details reuse instanced primitives; no textures or dependencies were added. Actor hitboxes, stats, animations, level tiles and ?-box rewards are unchanged by this art pass.
+
 ## Visual readability
 
 Collectibles are oval king cakes inspired by traditional Mardi Gras pastries: golden-brown rings with open centers, white icing drips, and alternating purple, green and gold sugar. Both 3D and 2D views, the HUD counter and supply-crate reward pops use the cake artwork. Pickup positions, magnet range, scoring, the 50-cake extra life and saved coin balances are unchanged. Storm-course lightning hazards are still hazards.

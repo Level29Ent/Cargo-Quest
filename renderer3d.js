@@ -129,7 +129,10 @@ try {
     const x=body.x+body.w/2, feet=448-body.y-body.h;
     const h=body.h, width=body.w, face=isPlayer?body.face:body.dir||body.face||-1;
     const gait=Math.sin(body.anim||0)*(body.onGround===false?2:7);
-    const color=body.flash>0?'white':isPlayer?(window.__game.cosmetic?.outfit||'purple'):boss?'red':'zombie';
+    const hurt=!isPlayer && body.flash>0;
+    const infectedSkin=body.type==='brute'?'#68816b':body.type==='runner'?'#a4b578':'zombie';
+    const skin=hurt?'white':isPlayer?'skin':infectedSkin;
+    const color=hurt?'white':isPlayer?(window.__game.cosmetic?.outfit||'purple'):boss?'red':body.type==='runner'?'brick':body.type==='brute'?'dark':body.type==='medic'?'teal':body.type==='thief'?'purple':'blue';
     // A flattened contact decal gives feet a grounding cue without mobile shadow maps.
     if(body.onGround)orb(x,feet+.5,-2,width*1.7,1.5,32,'#17212c');
     limb(x-6,feet+h*.38,x-7+gait,feet+8,0,8,isPlayer?'purple':'dark');
@@ -137,15 +140,27 @@ try {
     orb(x-7+gait,feet+5,4,13,9,18,'boots');orb(x+7-gait,feet+5,4,13,9,18,'boots');
     orb(x,feet+h*.53,0,width*.95,h*.43,24,color);
     box(x,feet+h*.36,1,width,5,25,'dark');box(x,feet+h*.36,15,6,5,3,'gold',0,'metal');
-    orb(x,feet+h*.82,0,width*.8,h*.27,23,isPlayer?'skin':'zombie');
+    // Brows, inset eye sockets and cheek planes replace the flat toy-like face.
+    orb(x,feet+h*.82,0,width*.72,h*.27,21,skin);
+    orb(x+face*2,feet+h*.755,4,width*.56,h*.105,18,skin);
+    for(const dx of [-width*.36,width*.36])orb(x+dx,feet+h*.82,1,4,7,6,skin);
+    for(const dx of [-4,5])orb(x+dx,feet+h*.86,10,7,6,4,'dark');
     const eyeY=feet+h*.86;
     orb(x-4,eyeY,11,5,5,3,'white');orb(x+5,eyeY,11,5,5,3,'white');
     orb(x-4+face,eyeY,13,2.5,3,2,isPlayer?'dark':'red',isPlayer?'matte':'glow');
     orb(x+5+face,eyeY,13,2.5,3,2,isPlayer?'dark':'red',isPlayer?'matte':'glow');
-    orb(x+face*3,feet+h*.8,13,4,5,5,isPlayer?'skin':'zombie');
-    box(x,feet+h*.75,11,9,2,3,'white');
+    orb(x+face*3,feet+h*.8,13,4,5,5,skin);
+    box(x,feet+h*.75,13,10,3.5,2,'dark');
+    for(let j=0;j<4;j++)box(x-3+j*2,feet+h*.755-(j%2)*.4,15,1.3,1.8,1,'white');
+    box(x-4,feet+h*.90,12,7,1.8,2,'dark',-.15);box(x+5,feet+h*.90,12,7,1.8,2,'dark',.15);
+    // Clothing seams, kneepads and gloves stay within the original visual footprint.
+    for(const dx of [-7,7]){
+      box(x+dx,feet+h*.24,7,6,5,3,'boots');
+      box(x+dx,feet+h*.37,14,6,6,3,color);
+    }
+    box(x,feet+h*.51,13,1.5,15,2,'gold');
     limb(x-9,feet+h*.62,x-12-gait*.5,feet+h*.41,3,7,color);
-    limb(x+face*9,feet+h*.61,x+face*22,feet+h*.51,9,7,isPlayer?'skin':'zombie');
+    limb(x+face*9,feet+h*.61,x+face*22,feet+h*.51,9,7,skin);
     if(isPlayer){
       // Three-point purple/green/gold jester cap, bells and ruffled collar.
       const sway=Math.sin((body.anim||0)*.7)*.10;
@@ -156,6 +171,14 @@ try {
       for(const [dx,dy] of [[-15,16],[15,16],[0,25]])orb(x+dx,feet+h+dy,0,5,5,5,'gold','metal');
       for(let j=-1;j<=1;j++)shape('cone',x+j*8,feet+h*.68,10,10,10,10,j===0?'gold':'white',Math.PI);
       box(x,feet+h*.54,14,3,16,2,'gold');
+      // Courier harness, split tunic, diamond applique and compact delivery pack.
+      box(x-8,feet+h*.54,14,3,18,3,'boots',-.15);
+      box(x+8,feet+h*.54,14,3,18,3,'boots',.15);
+      box(x-5,feet+h*.58,16,5,5,2,'green',Math.PI/4);
+      box(x+5,feet+h*.48,16,5,5,2,'gold',Math.PI/4);
+      box(x-face*13,feet+h*.52,-9,11,22,16,'purple');
+      box(x-face*13,feet+h*.52,0,12,4,2,'gold');
+      orb(x+face*22,feet+h*.51,11,7,7,7,'boots');
       const w=window.__game.weapon;
       const length=w.name==='Railgun'?46:w.name==='Shotgun'?36:30;
       const kick=body.recoil||0;
@@ -181,6 +204,12 @@ try {
       }
     }else{
       box(x,feet+h*.58,13,width*.65,3,2,boss?'gold':'brick');
+      // Ragged hem, exposed rib slashes and asymmetrical scalp stitches.
+      for(let j=0;j<3;j++)shape('cone',x-7+j*7,feet+h*.37,11,5,7,3,color,Math.PI);
+      for(let j=0;j<3;j++)box(x-4+j*3,feet+h*.52-j*2,14,1.5,7,2,'dark',-.5);
+      box(x+6,feet+h*.85,14,1.5,10,1,'brick',.4);
+      if(body.type==='brute'){for(const dx of [-width*.43,width*.43])orb(x+dx,feet+h*.63,1,14,16,19,skin);}
+      if(body.type==='runner')box(x,feet+h*.61,14,width*.65,3,2,'gold');
       if(!body.dead && body.type==='shield')box(x+face*17,feet+h*.48,12,7,h*.65,20,body.guardBreak>0?'dark':'blue',0,'metal');
       if(!body.dead && body.type==='thrower')orb(x+face*18,feet+h*.7,12,12,12,12,body.attack<35?'red':'orange','glow');
       if(!body.dead && body.type==='thief'){box(x,feet+h*.65,14,20,5,4,'gold');box(x-face*8,feet+h*.5,-12,16,18,10,'gold');}

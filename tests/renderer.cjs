@@ -68,6 +68,17 @@ for(const type of ['leaper','plated','medic','charger']){
   assert.ok(lastScene.children.filter(m=>m.isInstancedMesh&&m.count>0).length<100);
  }
 }
+// Hero tailoring and infected role colors are visual only and survive every facing/flash pose.
+for(const type of ['walker','runner','brute','shield','thief','thrower','plated','medic','leaper','charger']){
+ test.newGame(0);test.state='play';const z=test.makeZombie(350,['shield','thief','thrower'].includes(type)?'walker':type,'nola',()=>.5);z.type=type;z.active=true;test.L.zs=[z];
+ const game={L:test.L,cam:0,frame:200,player:test.p,effects:{},weapon:test.WEAPONS[0],flagY:64,bullets:[],spits:[],parts:[],state:'play',cosmetic:{outfit:'#31bcb7',skin:'#bac5d1'}};
+ for(const face of [-1,1])for(const flash of [0,4]){
+  z.dir=face;z.flash=flash;test.p.face=face;const before=JSON.stringify([z,test.p]);world.window.__game=game;view.render(game);assert.equal(JSON.stringify([z,test.p]),before,'drawing does not mutate actors');
+  const meshes=lastScene.children.filter(m=>m.isInstancedMesh&&m.count>0);assert.ok(meshes.some(m=>m.material.color.getHexString()==='31bcb7'),'earned hero outfit retained');
+  for(const m of meshes)assert.ok(m.instanceMatrix.array.subarray(0,m.count*16).every(Number.isFinite));
+  assert.ok(meshes.length<100,'role details remain batched');
+ }
+}
 // Safe houses and parade confetti render in all regions, including boss exits.
 for(const stage of [0,4,5,9,10,14,15,19,20,24,99]){
  test.newGame(stage);test.L.celebration={ticks:100};const x=test.L.exitX*32;

@@ -2248,6 +2248,10 @@ function drawZombie(z){
   cx.restore();
   cx.restore();
   if(!z.dead){
+    // Torn clothing, facial scar and boot highlights retain each role's silhouette.
+    cx.fillStyle='#263126';cx.fillRect(z.x+6,z.y+z.h-3,z.w-8,2);
+    cx.fillStyle='#4b2928';cx.fillRect(z.x+z.w/2+3,z.y+9,2,6);
+    for(let j=0;j<3;j++){cx.fillStyle='#20302b';cx.fillRect(z.x+8+j*4,z.y+z.h*.48+j*2,2,6);}
     if(z.type==='shield'){cx.fillStyle=z.guardBreak>0?'#666':'#6ec4e8';cx.fillRect(z.x+z.w/2+z.dir*16-4,z.y+14,8,30);}
     if(z.type==='charger'){cx.fillStyle='#ff9b54';cx.fillRect(z.x-2,z.y+14,10,14);cx.fillRect(z.x+z.w-8,z.y+14,10,14);}
     if(z.type==='thrower')sh('LOB',z.x+z.w/2,z.y-12,'#ffab65',7,'center');
@@ -2339,6 +2343,10 @@ function drawPlayer(p){
   cx.fillStyle = '#222'; cx.fillRect(-10, 8, 20, 2);
   if (up.armor > 0){ cx.fillStyle = '#3a3f2a'; cx.fillRect(-9, 10, 18, 11); cx.fillStyle = '#2a2e1e'; cx.fillRect(-9, 15, 18, 2); }
   cx.fillStyle = '#f5b800'; cx.font = '5px "Press Start 2P", monospace'; cx.textAlign='center'; cx.fillText('29', -1, 18);
+  // Courier tailoring matches the enhanced 3D outfit without changing the logo head.
+  cx.fillStyle='#d8b65f';cx.fillRect(-8,9,2,12);cx.fillRect(7,9,2,12);
+  cx.fillStyle='#78d6a0';cx.save();cx.translate(-4,13);cx.rotate(Math.PI/4);cx.fillRect(-2,-2,4,4);cx.restore();
+  cx.fillStyle='#4a2860';cx.fillRect(-15,9,5,15);cx.fillStyle='#f5b800';cx.fillRect(-15,14,5,2);
   // back arm to pistol grip
   cx.fillStyle = '#000'; cx.fillRect(-4, 10, 5, 9); cx.fillStyle = '#e8b98a'; cx.fillRect(-1, 17, 5, 4);
   // Shared gun body with distinct new weapon attachments.
