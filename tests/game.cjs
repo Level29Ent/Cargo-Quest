@@ -448,24 +448,26 @@ audit('celebration respects reduced motion and campaign overlay pause, then fina
  t.newGame(0);assert.equal(t.L.celebration,undefined,'retries/new levels reset party');
 });
 
-audit('power boxes are scattered, deterministic, single-use and use all eighteen rewards',()=>{
+audit('existing mystery boxes contain deterministic single-use powers from all eighteen rewards',()=>{
  const rewards=new Set();
  for(let i=0;i<100;i++){
   const l=t.buildLevel(i),again=t.buildLevel(i),entries=Object.entries(l.boxPowers);
   assert.deepEqual(JSON.parse(JSON.stringify(l.boxPowers)),JSON.parse(JSON.stringify(again.boxPowers)));
-  assert.ok(entries.length>0,'every campaign stage has powers');
-  if(!l.info.isBoss)assert.ok(entries.length>=3,'multiple powers along each normal route');
-  for(const [key,id] of entries){const [x,y]=key.split(',').map(Number);assert.equal(l.grid[y][x],'S');assert.ok(x<(l.info.isBoss?19:l.W-52));rewards.add(id);}
-  // The first added box is always reachable from the street without any upgrades.
-  t.newGame(i);t.state='play';t.L.zs=[];t.L.elements=[];t.L.pickups=[];t.L.bolts=[];
-  const [x,y]=Object.keys(t.L.boxPowers).find(key=>{const [x,y]=key.split(',').map(Number);return y===8 && t.L.grid[12][x]==='#' && [9,10,11].every(y=>t.L.grid[y][x]===' ');}).split(',').map(Number);
-  Object.assign(t.p,{x:x*32+3,y:324,vx:0,vy:0,onGround:true,coyote:8,inv:9999});
-  t.touch.J=true;t.jump();for(let n=0;n<20 && t.L.grid[y][x]==='S';n++)t.update();t.releaseControls();
-  assert.equal(t.L.grid[y][x],'U','normal jump activates a box in stage '+i);
+  const mysteryCount=l.grid.flat().filter(tile=>tile==='?').length;
+  assert.equal(entries.length,Math.ceil(mysteryCount/2),'half the existing mystery boxes contain powers');
+  assert.ok(!l.grid.some(row=>row.includes('S')),'no separate power-box tile');
+  for(const [key,id] of entries){const [x,y]=key.split(',').map(Number);assert.equal(l.grid[y][x],'?');rewards.add(id);}
+
  }
  assert.equal(rewards.size,18);
+ cleanRun();t.L.grid=Array.from({length:14},(_,y)=>Array(50).fill(y>=12?'#':' '));t.L.W=50;t.L.flagX=-1;
+ t.L.grid[8][10]='?';t.L.boxPowers={'10,8':'shield'};
+ Object.assign(t.p,{x:323,y:324,vx:0,vy:0,onGround:true,coyote:8});t.touch.J=true;t.jump();
+ for(let n=0;n<20 && t.L.grid[8][10]==='?';n++)t.update();t.releaseControls();
+ assert.equal(t.L.grid[8][10],'U','jumping into an existing mystery box activates its power');assert.ok(t.effects.shield>0);
+
  for(const item of t.SHOP_POWERS){
-  cleanRun();t.L.grid[8][10]='S';t.L.boxPowers={'10,8':item.id};t.p.health=1;
+  cleanRun();t.L.grid[8][10]='?';t.L.boxPowers={'10,8':item.id};t.p.health=1;
   const wallet=t.wallet,time=t.time;t.hitBlock(10,8);
   assert.equal(t.L.grid[8][10],'U');assert.equal(t.wallet,wallet,'free rewards never spend coins');
   if(item.id==='heal')assert.equal(t.p.health,3);else if(item.id==='time')assert.equal(t.time,time+60);else assert.equal(t.effects[item.id],1800);
@@ -473,7 +475,7 @@ audit('power boxes are scattered, deterministic, single-use and use all eighteen
   const effects=JSON.stringify(t.effects),health=t.p.health,after=t.time,count=t.parts.length;
   t.hitBlock(10,8);assert.equal(JSON.stringify(t.effects),effects);assert.equal(t.p.health,health);assert.equal(t.time,after);assert.equal(t.parts.length,count,'used box gives no second reward');
  }
- cleanRun();t.L.grid[8][10]='?';const coins=t.wallet;t.hitBlock(10,8);assert.equal(t.wallet,coins+1);
+ cleanRun();t.L.boxPowers={};t.L.grid[8][10]='?';const coins=t.wallet;t.hitBlock(10,8);assert.equal(t.wallet,coins+1);
  t.L.grid[8][11]='M';t.p.health=1;t.hitBlock(11,8);assert.equal(t.p.health,2,'medkit still heals one heart');
  t.startDaily('2026-11-19');assert.ok(!t.L.grid.some(row=>row.includes('S')));assert.equal(Object.keys(t.L.boxPowers).length,0);
  t.startSurvival();assert.ok(!t.L.grid.some(row=>row.includes('S')));

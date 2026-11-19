@@ -326,9 +326,9 @@ try {
           if(x%3===0){box(wx,wy+17,12,18,1,2,'dark');box(wx-7,wy+17,15,2,1,10,'dark');}
         }
       }else{
-        const color=tile==='='?'#28788b':tile==='S'?'teal':tile==='?'?'gold':tile==='M'?'white':tile==='B'?'#d27b38':tile==='H'?'#a85d30':tile==='U'?'#826044':'#c97831';
+        const color=tile==='='?'#28788b':tile==='?'?'gold':tile==='M'?'white':tile==='B'?'#d27b38':tile==='H'?'#a85d30':tile==='U'?'#826044':'#c97831';
         box(wx,wy,0,31,32,38,color);
-        if(tile==='?'||tile==='M'||tile==='S'){const mark=tile==='S'?'white':tile==='M'?'red':'purple';box(wx,wy,21,5,17,3,mark);box(wx,wy+3,21,14,5,3,mark);}
+        if(tile==='?'||tile==='M'){const mark=tile==='M'?'red':'purple';box(wx,wy,21,5,17,3,mark);box(wx,wy+3,21,14,5,3,mark);}
         // Dark frame + bright top lip: solid objects read independently of backdrop or hue.
         const topColor=tile==='='?'#7cfff0':'#ffe3a0';
         box(wx,wy+14,21,32,4,3,'#101b29',0,'cue');
