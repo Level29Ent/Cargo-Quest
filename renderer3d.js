@@ -133,7 +133,7 @@ try {
     const hurt=!isPlayer && body.flash>0;
     const infectedSkin=body.type==='brute'||body.type==='crawler'?'#68816b':body.type==='runner'?'#a4b578':body.type==='leaper'?'teal':body.type==='charger'?'#68816b':'zombie';
     const skin=hurt?'white':isPlayer?'skin':infectedSkin;
-    const color=hurt?'white':isPlayer?(window.__game.cosmetic?.outfit||'purple'):boss?'red':body.type==='runner'?'brick':body.type==='brute'?'dark':body.type==='medic'?'teal':body.type==='thief'?'purple':'boots';
+    const color=hurt?'white':isPlayer?(body.role==='partner'?'teal':window.__game.cosmetic?.outfit||'purple'):boss?'red':body.type==='runner'?'brick':body.type==='brute'?'dark':body.type==='medic'?'teal':body.type==='thief'?'purple':'boots';
     // A flattened contact decal gives feet a grounding cue without mobile shadow maps.
     if(body.onGround)orb(x,feet+.5,-2,width*1.7,1.5,32,'#17212c');
     limb(x-6,feet+h*.38,x-7+gait,feet+8,0,8,isPlayer?'purple':'dark');
@@ -165,7 +165,7 @@ try {
     if(isPlayer){
       // Three-point purple/green/gold jester cap, bells and ruffled collar.
       const sway=Math.sin((body.anim||0)*.7)*.10;
-      orb(x,feet+h*.96,0,width,9,26,window.__game.cosmetic?.outfit||'purple');
+      orb(x,feet+h*.96,0,width,9,26,body.role==='partner'?'teal':window.__game.cosmetic?.outfit||'purple');
       shape('cone',x-10,feet+h+7,0,12,22,14,'purple',.6+sway,'matte',zAxis);
       shape('cone',x+10,feet+h+7,0,12,22,14,'green',-.6+sway,'matte',zAxis);
       shape('cone',x,feet+h+12,-3,10,25,12,'gold');
@@ -430,7 +430,7 @@ try {
       box(cache.x,448-cache.y,0,25,25,25,'teal',frame*.02);box(cache.x,448-cache.y,15,4,16,3,'white');box(cache.x,448-cache.y,15,16,4,3,'white');
     }
     if(L.cargo && !L.cargo.delivered){
-      const c=L.cargo,x=c.carried?player.x+player.w/2:c.x,y=c.carried?player.y-18:c.y;
+      const c=L.cargo,carrier=c.carrier==='partner'&&game.partner&&!game.partner.down?game.partner:player,x=c.carried?carrier.x+carrier.w/2:c.x,y=c.carried?carrier.y-18:c.y;
       box(x,448-y,6,26,26,24,'gold',0,'metal');box(x,448-y,20,4,26,2,'dark');box(x,448-y,20,26,4,2,'white');
     }
     if(L.boss && !L.boss.dead && (L.boss.signatureWarning>0 || L.boss.strikeTicks>0)){
@@ -445,6 +445,17 @@ try {
       box(L.flagX*32+15,385,0,12,12,12,'gold');
     }
     if(L.exitX>0 && (L.flagX>0 || L.info.isBoss) && L.exitX*32>cam-250 && L.exitX*32<cam+950)safeHouse(L.exitX*32,!!L.celebration);
+    if(L.info.isBoss){
+      const region=L.info.loc.id,arenaColor={nola:'purple',la:'orange',hou:'teal',lej:'silver',pi:'gold'}[region];
+      for(const x of [21*32,42*32]){
+        box(x,140,-70,20,150,24,'dark',0,'scenery');box(x,220,-70,28,8,32,arenaColor,0,'scenery');
+        if(region==='nola')shape('cone',x,238,-70,22,32,22,arenaColor);
+        if(region==='la')for(let j=-1;j<=1;j++)orb(x+j*8,216,-54,5,5,4,'gold');
+        if(region==='hou')box(x,135,-54,6,100,3,arenaColor);
+        if(region==='lej')for(let j=0;j<3;j++)box(x,100+j*30,-54,20,8,4,arenaColor);
+        if(region==='pi')box(x,185,-54,44,28,3,arenaColor);
+      }
+    }
     if(L.secretRoute?.kind==='rooftop'){
       const x=L.secretRoute.x+96;
       box(x,140,-80,192,148,48,'#334654',0,'scenery');
@@ -471,6 +482,7 @@ try {
       const dust=p.kind==='puff',size=dust?Math.max(2,7*p.t/14):4;
       orb(p.x,448-p.y,8,size,size,size,dust?'silver':p.kind==='gore'?'red':'gold',p.kind==='spark'?'glow':'matte');
     }
+    if(game.partner&&!game.partner.down&&!(game.partner.inv>0&&frame%6<3))person(game.partner,true);
     if(!(game.state==='play'&&player.inv>0&&frame%6<3))person(player,true);
     for(const b of batches.values()){
       b.mesh.count=b.count;b.mesh.instanceMatrix.needsUpdate=true;
