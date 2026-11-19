@@ -184,6 +184,7 @@ try {
       if(!body.dead && body.type==='shield')box(x+face*17,feet+h*.48,12,7,h*.65,20,body.guardBreak>0?'dark':'blue',0,'metal');
       if(!body.dead && body.type==='thrower')orb(x+face*18,feet+h*.7,12,12,12,12,body.attack<35?'red':'orange','glow');
       if(!body.dead && body.type==='thief'){box(x,feet+h*.65,14,20,5,4,'gold');box(x-face*8,feet+h*.5,-12,16,18,10,'gold');}
+      if(!body.dead && body.type==='charger'){for(const dx of [-12,12])box(x+dx,feet+h*.65,10,12,15,14,'orange');}
       if(!body.dead && body.type==='plated'){box(x,feet+h*.53,14,width*.85,h*.4,6,'silver',0,'metal');box(x,feet+h*.9,5,width,7,26,'silver');}
       if(!body.dead && body.type==='medic'){
         box(x,feet+h*.55,14,20,21,5,'white');box(x,feet+h*.55,18,4,15,2,'red');box(x,feet+h*.55,18,14,4,2,'red');
@@ -408,6 +409,7 @@ try {
     }
     for(const shot of game.spits)orb(shot.x,448-shot.y,4,12,12,12,'green','glow');
     for(const p of game.parts.slice(-100)){
+      if(p.kind==='impact'||p.kind==='dash')continue;
       if(p.kind==='confetti'){box(p.x,448-p.y,30,4,3,1,p.c,p.spin,'cue');continue;}
       if(p.kind==='powerpop'){box(p.x,448-p.y,12,22,22,12,'teal');box(p.x,448-p.y,20,4,15,3,'white');box(p.x,448-p.y,20,15,4,3,'white');continue;}
       if(p.kind==='boltpop'){kingCake(p.x,448-p.y);continue;}

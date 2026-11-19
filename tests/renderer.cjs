@@ -58,7 +58,7 @@ for(const stage of [4,9,14,19,24]){
  for(const m of lastScene.children.filter(m=>m.isInstancedMesh))if(m.count)assert.ok(m.instanceMatrix.array.subarray(0,m.count*16).every(Number.isFinite));
 }
 // Every new enemy/weapon/effect takes the real geometry path, with finite transforms.
-for(const type of ['leaper','plated','medic']){
+for(const type of ['leaper','plated','medic','charger']){
  test.newGame(20);test.state='play';const z=test.makeZombie(300,type,'nola',()=>.5);
  Object.assign(z,{active:true,hp:1,attack:15});test.L.zs=[z];
  for(const w of test.WEAPONS.slice(6)){
